@@ -1,0 +1,14 @@
+<launch>
+  <anode pkg="image_view2" type="image_view2" name="select_ref_white" machine="c2">
+    <remap from="image" to="/openni_c2/rgb/image_rect_color"/>
+    <remap from="camera_info" to="/openni_c2/rgb/camera_info"/>
+    <remap from="/openni_c2/rgb/image_rect_color/screenpoint"
+           to="/openni_c2/rgb/screenpoint"/>
+  </anode>
+  <node pkg="roseus" type="roseus" name="marker_publish" output="screen"
+        args="$(find jsk_perception)/euslisp/kalman-filtered-objectdetection-marker.l" >
+    <remap from="/openni/rgb/ObjectDetection" to="/openni_c2/depth_registered/ObjectDetection" />
+  </node>
+  <include file="$(find detect_cans_in_fridge_201202)/launch/white_balance.launch" />
+  <include file="$(find detect_cans_in_fridge_201202)/launch/detect_cans.launch" />
+</launch>
