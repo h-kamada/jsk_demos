@@ -130,7 +130,7 @@
       ((send target-obj :stamp);;for tf error
        (setq to target-obj)
        (ros::unsubscribe *detection-topic*)
-       (grasp-can-single target-obj :rotation 20 :use-arm :rarm)
+       ;;       (grasp-can-single target-obj :rotation 20 :use-arm :rarm)
        )
       (t
        nil)
