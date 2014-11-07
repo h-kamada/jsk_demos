@@ -4,7 +4,8 @@
 (load "package://pr2eus/pr2-interface.l")
 (pr2-init)
 
-(defparameter *detection-topic* "/openni_c2/depth_registered/ObjectDetection")
+;;(defparameter *detection-topic* "/openni_c2/depth_registered/ObjectDetection")
+(defparameter *detection-topic* "/openni/rgb/ObjectDetection")
 (setq *use-arm-navigation* nil)
 (setq *tfb* (instance ros::transform-broadcaster :init))
 (defun grasp-can-single (obj &key (rotation 0) (use-arm :rarm) (grasp-depth 35)(func-time 7))
@@ -118,19 +119,43 @@
 
     ;; move to original pose
     (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
-    (send *ri* :angle-vector orig-av mvt)
+x    (send *ri* :angle-vector orig-av mvt)
     (send *ri* :wait-interpolation)
     )
   )
 
 (defun pub-cb (target-obj marker-life force msg)
-  (let ((filter-obj))
+  (let ((filter-obj)
+        (cc (make-coords))
+        xdiff
+        df
+        via
+        )
     (detection-interface-objectdetection force target-obj msg)
     (cond
       ((send target-obj :stamp);;for tf error
        (setq to target-obj)
-       (ros::unsubscribe *detection-topic*)
-       ;;       (grasp-can-single target-obj :rotation 20 :use-arm :rarm)
+       ;;diff (send (send *pr2* :worldcoords) :transformation (send to :worldcoords))
+       (setq xdiff (elt (send (send (send *pr2* :worldcoords) :transformation (send to :worldcoords)) :pos) 0))
+       (ros::ros-info "xdiff:~A" xdiff)
+       (setq df (- xdiff 700))
+       (send *pr2* :translate (float-vector df 0 0))
+       (setq via (send (send (send *pr2* :worldcoords) :transformation
+                             (send target-obj :worldcoords)) :copy-worldcoords))
+       (send *pr2* :rarm :inverse-kinematics
+             (send via :transform (send *pr2* :worldcoords) :world)
+             :rotation-axis t)
+       (send *ri* :angle-vector (send *pr2* :angle-vector))
+;;;;
+       ;; (send *pr2* :translate #f(300 0 0))
+       ;; (grasp-can-single target-obj :rotation 20 :use-arm :rarm)
+;;;;;;;;;;;;;;;;;
+       ;; (setq tar (send (send (send *pr2* :worldcoords) :transformation
+       ;;                    (send obj :worldcoords)) :copy-worldcoords))
+       ;; (send *pr2* use-arm :inverse-kinematics
+       ;;       (send via1 :transform (send *pr2* :worldcoords) :world)
+       ;;       :rotation-axis t)
+;;;;;;;;;;;;;;;;;
        )
       (t
        nil)
@@ -139,6 +164,8 @@
   )
 
 
+;;success #<coordinates #X95526b0  776.645 -195.98 860.438 / -1.505 -0.005 -2.092>
+;;fail    #<coordinates #X9b068a8  1074.935 -195.798 868.405 / -1.505 -0.005 -2.088>
 
 (defun only-perception (&key (timeout 10) ((:type atype) nil) (tf-force nil)
                              (diff-position 10.0)
