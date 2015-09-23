@@ -5,7 +5,7 @@
   <arg name="DEMOTYPE" default="map" />
   <arg name="app_manager" default="false" />
   <arg name="run_behavior" default="true" />
-  <arg name="visualize_fridge" default="true" />
+  <arg name="visualize_fridge" default="false" />
   <arg name="roi" default="true" />
   <include file="$(find pr2_machine)/$(env ROBOT).machine" />
   <!-- <arg name="app_manager" default="true" /> -->
@@ -21,11 +21,12 @@
     <param name="relative_pose" value="0.22 0.05 0.075  0.707107 0 -0.707107 0"/>
   </node>
   <node name="gaussianmanager" pkg="nodelet" type="nodelet" args="manager"
-        output="screen" if="$(arg visualize_fridge)"/>
+        output="screen" if="true"/>
   <node pkg="nodelet" type="nodelet" name="posewithcovstampedtogaussian"
         args="load jsk_pcl/PoseWithCovarianceStampedToGaussianPointCloud gaussianmanager"
         output="screen" >
-    <remap from="~input" to="/simplecov" />
+    <!-- <remap from="~input" to="/simplecov" /> -->
+    <remap from="~input" to="/posewithcovstamped" />
     <rosparam>
       cut_plane: flipped_yz
       normalize_method: normalize_height

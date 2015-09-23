@@ -822,6 +822,92 @@
   )
 
 
+(defun search ()
+  (while t
+    (setq res (check-detection :type "fridge" :speak nil))
+    (setq 3dev (car (cdr res)))
+    (ros::ros-info "3dev:~A" 3dev)
+    (unix:sleep 1)
+    ))
+
+(defun approach-loop (&key (wait t) (move t))
+  (let (res target-obj move-dis via1 via2 flag 3dev av)
+    (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+    (send *ri* :stop-grasp :rarm)
+    (setq res (check-detection :type "fridge" :speak nil))
+    (setq *r* res)
+    (setq target-obj (car res))
+    (setq 3dev (car (cdr res)))
+    ;; (setq move-dis (list (* (- (elt (send target-obj :pos) 0) 772) 0.001)
+    ;;                      (* (- (elt (send target-obj :pos) 1) 98) 0.001)))
+    (setq move-dis (list (* (- (elt (send target-obj :pos) 0) 770) 0.001)
+                         (* (- (elt (send target-obj :pos) 1) 98) 0.001)))
+    ;; (send target-obj :locate (float-vector 772 98 (elt (send target-obj :pos) 2)) :world)
+    (send target-obj :locate (float-vector 700 98 1100) :world)
+    (setq via2 (send (send target-obj :copy-worldcoords) :translate (float-vector (- 3dev) 0 0)))
+    (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+    (send *pr2* :rarm :inverse-kinematics
+          (send via2 :transform (send *pr2* :worldcoords) :world)
+          :rotation-axis t)
+    (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
+    ;; (send *ri* :go-force (elt move-dis 0) (elt move-dis 1) 0)
+    (if move
+        (send *ri* :go-pos-unsafe-no-wait (elt move-dis 0) (elt move-dis 1) 0))
+    (while (> 3dev 7)
+      (ros::ros-info "cur-3dev:~A" 3dev)
+      (setq res (check-detection :type "fridge" :speak nil))
+      (setq *r* res)
+      (setq target-obj (car res))
+      (setq 3dev (car (cdr res)))
+      (ros::ros-info "cur-3dev:~A" 3dev)
+      (setq via2 (send (send target-obj :copy-worldcoords) :locate (float-vector (- 3dev) 0 0)))
+      (setq av nil)
+      (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+      (setq av (send *pr2* :rarm :inverse-kinematics
+                     (send via2 :transform (send *pr2* :worldcoords) :world)
+                     :rotation-axis t))
+      (if av
+          (progn
+            (send *ri* :angle-vector av 1000 :rarm-controller)
+            )
+        (progn ;;ik fail
+          (send target-obj :locate (float-vector 700 98 1100) :world)
+          (setq via2 (send (send target-obj :copy-worldcoords) :translate (float-vector (- 3dev) 0 0)))
+          (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+          (setq av (send *pr2* :rarm :inverse-kinematics
+                         (send via2 :transform (send *pr2* :worldcoords) :world)
+                         :rotation-axis t))
+          (send *ri* :angle-vector av 1000 :rarm-controller)
+          )
+        )
+      )
+    (ros::ros-info "cur-3dev:~A" 3dev)
+    (setq via2 (send (send target-obj :copy-worldcoords) :locate (float-vector (- 10) 0 0)))
+    (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+    (setq av (send *pr2* :rarm :inverse-kinematics
+                   (send target-obj :transform (send *pr2* :worldcoords) :world)
+                   :rotation-axis t))
+    ;; add unsafe-wait
+    (ros::ros-info "hoge")
+    (send *ri* :go-pos-unsafe-wait)
+    ;; end add unsafe-wait
+
+    (send *ri* :angle-vector av 1000)
+    )
+  )
+
+(defun catch-fridge-handle (&key (wait t))
+  (send *ri* :start-grasp :rarm :gain 0.1)
+  (if wait (send *ri* :wait-interpolation))
+  )
+
+(defun app ()
+  (send *ri* :angle-vector (send *pr2* :reset-pose) 3000)
+;;  (send *ri* :wait-interpolation)
+  (approach-loop)
+  (catch-fridge-handle :wait t)
+  )
+
 
 (warn ";; define open-fridge-door")
 (defvar *fridge-distance-threshold* 25.0)
