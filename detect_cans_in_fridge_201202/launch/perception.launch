@@ -6,7 +6,7 @@
   <arg name="app_manager" default="false" />
   <arg name="run_behavior" default="true" />
   <arg name="visualize_fridge" default="false" />
-  <arg name="roi" default="true" />
+  <arg name="roi" default="false" />
   <include file="$(find pr2_machine)/$(env ROBOT).machine" />
   <!-- <arg name="app_manager" default="true" /> -->
 
@@ -59,7 +59,7 @@
   <group ns="/kinect_head/rgb">
     <node name="fridge_demo_sift" pkg="imagesift"
           type="imagesift" launch-prefix="nice -n +10" output="screen"
-          machine="c2" >
+          machine="c2" respawn="true" >
       <remap from="image" to="/kinect_head_c2/rgb/image_rect_color" />
       <remap from="camera_info" to="/kinect_head_c2/rgb/camera_info"/>
       <param name="use_mask" value="$(arg roi)" />
