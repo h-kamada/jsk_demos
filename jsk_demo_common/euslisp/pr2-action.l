@@ -357,30 +357,34 @@
 	 (lst (cddr cds-traj))
 	 (time-tick (/ (* (- func-time 16) 1000) (length lst)));;changing opening-door speed
 	 avs tms)
-    (when move-robot  ;; open-gripper
-      (send *ri* :move-gripper hand 0.09 :wait nil))
-    (when fix-waist-z
-      (unless (numberp fix-waist-z) (setq fix-waist-z 130))
-      (send *pr2* :torso :waist-z :joint-angle fix-waist-z))
-    (cond
-     ((move-arm hand st0
-                :use-torso (if use-torso (/ use-torso 5))
-                :rotation-axis t :sec start-sec :move-robot move-robot)
-      t)
-     (t
-      (ros::ros-warn "Could not solve ik, return from execute-open")
-      (return-from move-fridge-traj nil)))
 
-    (move-arm hand st1
-              :use-torso (if use-torso (/ use-torso 5))
-              :rotation-axis t :sec start-sec :move-robot move-robot)
+    ;; Begin Commented out for merging
 
-    (let ((grasp-ret (if move-robot (send *ri* :start-grasp hand :gain 0.1 :objects nil) 10)))
-      (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
-                 (and grasp-check
-                      (< grasp-ret 8))) ;; grasp
-        (ros::ros-warn "Grasp handle failed, return from execute-open")
-        (return-from move-fridge-traj nil)))
+    ;; (when move-robot  ;; open-gripper
+    ;;   (send *ri* :move-gripper hand 0.09 :wait nil))
+    ;; (when fix-waist-z
+    ;;   (unless (numberp fix-waist-z) (setq fix-waist-z 130))
+    ;;   (send *pr2* :torso :waist-z :joint-angle fix-waist-z))
+    ;; (cond
+    ;;  ((move-arm hand st0
+    ;;             :use-torso (if use-torso (/ use-torso 5))
+    ;;             :rotation-axis t :sec start-sec :move-robot move-robot)
+    ;;   t)
+    ;;  (t
+    ;;   (ros::ros-warn "Could not solve ik, return from execute-open")
+    ;;   (return-from move-fridge-traj nil)))
+
+    ;; (move-arm hand st1
+    ;;           :use-torso (if use-torso (/ use-torso 5))
+    ;;           :rotation-axis t :sec start-sec :move-robot move-robot)
+
+    ;; (let ((grasp-ret (if move-robot (send *ri* :start-grasp hand :gain 0.1 :objects nil) 10)))
+    ;;   (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
+    ;;              (and grasp-check
+    ;;                   (< grasp-ret 8))) ;; grasp
+    ;;     (ros::ros-warn "Grasp handle failed, return from execute-open")
+    ;;     (return-from move-fridge-traj nil)))
+    ;; End Commented out for merging
 
     (dolist (rr lst)
       (let ((ik-solved
@@ -407,28 +411,30 @@
       (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
       (send *ri* :angle-vector-sequence (reverse avs) tms))
     ;; finalize
-    (cond
-     ((integerp wait-time)
-      (send *ri* :ros-wait wait-time :spin-self t)) ;; attention-check ...
-     ((numberp wait-time)
-      (send *ri* :ros-wait wait-time :spin-self t) ;; attention-check ...
-      ;; (unix::usleep
-      ;; (round (* wait-time 1000 1000)))
-      )
-     (wait-time
-      (send *ri* :wait-interpolation)))
-    ;; (send *ri* :stop-grasp hand)
-    ;; (send *ri* :wait-interpolation)
-    ;; ;;
-    (send *ri* :ros-wait 0.0 :spin t :spin-self t) ;; attention-check ...
-    (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
-    (let ((end-pt (send *pr2* hand :end-coords :worldpos))
-          idx)
-      (setq idx (position (find-extream lst #'(lambda(x) (distance (send x :worldpos) end-pt)) #'<) lst))
-      (ros::ros-info "idx = [~a/~a]" idx (length lst))
-      (if (send *ri* :simulation-modep) (return-from move-fridge-traj t))
-      (when (< idx (/ (length lst) 2))
-        (return-from move-fridge-traj nil)))
+
+    ;; Commented out for merging
+    ;; (cond
+    ;;  ((integerp wait-time)
+    ;;   (send *ri* :ros-wait wait-time :spin-self t)) ;; attention-check ...
+    ;;  ((numberp wait-time)
+    ;;   (send *ri* :ros-wait wait-time :spin-self t) ;; attention-check ...
+    ;;   ;; (unix::usleep
+    ;;   ;; (round (* wait-time 1000 1000)))
+    ;;   )
+    ;;  (wait-time
+    ;;   (send *ri* :wait-interpolation)))
+    ;; ;; (send *ri* :stop-grasp hand)
+    ;; ;; (send *ri* :wait-interpolation)
+    ;; ;; ;;
+    ;; (send *ri* :ros-wait 0.0 :spin t :spin-self t) ;; attention-check ...
+    ;; (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+    ;; (let ((end-pt (send *pr2* hand :end-coords :worldpos))
+    ;;       idx)
+    ;;   (setq idx (position (find-extream lst #'(lambda(x) (distance (send x :worldpos) end-pt)) #'<) lst))
+    ;;   (ros::ros-info "idx = [~a/~a]" idx (length lst))
+    ;;   (if (send *ri* :simulation-modep) (return-from move-fridge-traj t))
+    ;;   (when (< idx (/ (length lst) 2))
+    ;;     (return-from move-fridge-traj nil)))
     t))
 
 ;;
@@ -834,7 +840,7 @@
   (let (res target-obj move-dis via1 via2 flag 3dev av)
     (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
     (send *ri* :stop-grasp :rarm)
-    (setq res (check-detection :type "fridge" :speak nil))
+    (setq res (check-detection-service :type "fridge" :speak nil))
     (setq *r* res)
     (setq target-obj (car res))
     (setq 3dev (car (cdr res)))
@@ -853,9 +859,9 @@
     ;; (send *ri* :go-force (elt move-dis 0) (elt move-dis 1) 0)
     (if move
         (send *ri* :go-pos-unsafe-no-wait (elt move-dis 0) (elt move-dis 1) 0))
-    (while (> 3dev 7)
+    (while (> 3dev 10)
       (ros::ros-info "cur-3dev:~A" 3dev)
-      (setq res (check-detection :type "fridge" :speak nil))
+      (setq res (check-detection-service :type "fridge" :speak nil))
       (setq *r* res)
       (setq target-obj (car res))
       (setq 3dev (car (cdr res)))
@@ -912,6 +918,22 @@
 (warn ";; define open-fridge-door")
 (defvar *fridge-distance-threshold* 25.0)
 (defvar *fridge-rotation-threshold* 0.09)
+
+(defun short-calc-cds-for-open-fridge ()
+  (let (cds)
+    ;; (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
+    ;;                            :detection-topic "/kinect_head/rgb/ObjectDetection"))
+    ;; 融合バージョンでは、grasp-can のためにcheck-detectionが上書きされないように本家と微妙に変える
+    (setq cds (car (check-detection-service :type "fridge" :speak nil)))
+    (setq cds
+          (make-coords :pos (send cds :worldpos)
+                       :rpy (list (caar (send cds :rpy-angle)) 0 0)))
+    (send cds :transform (send *pr2* :worldcoords) :world)
+    cds
+    ))
+
+
+
 (defun open-fridge-door (&key (open-fridge-func #'open-fridge-traj)
                               (torso-lift 130) (head-pitch 14)
                               (use-arm :rarm) (move t)
@@ -926,23 +948,42 @@
     ;; initial pose
     (open-fridge-door-initial-pose :door-type door-type :head-pitch head-pitch :torso-lift torso-lift :ratio ratio :wait wait)
 
+    ;; Begin Commented out for merging
     ;; detect fridge and open door
-    (dotimes (i 10 nil)
-      ;; detect fridge and move to the fridge door
-      (setq ret (move-to-and-open-fridge-door :door-type door-type :ratio ratio :look-around look-around :head-pitch head-pitch :torso-lift torso-lift :move move :open-fridge-func open-fridge-func :wait wait))
-      (if ret (return))
-      )
+    ;; (dotimes (i 10 nil)
+    ;;   ;; detect fridge and move to the fridge door
+    ;;   (setq ret (move-to-and-open-fridge-door :door-type door-type :ratio ratio :look-around look-around :head-pitch head-pitch :torso-lift torso-lift :move move :open-fridge-func open-fridge-func :wait wait))
+    ;;   (if ret (return))
+    ;;   )
 
-    (when (not ret)
-      (ros::ros-info "TIMEOUT: open-fridge-door");;
-      (if (and (boundp '*use-voicetext*) *use-voicetext*)
-          (cond
-           ((and (boundp '*use-english*) *use-english*)
-            (speak-jp "I could not find the refrigerator."))
-           (t (speak-jp "冷蔵庫を見つけられませんでした。")))
-        (speak-jp "れいぞうこ を みつけられません でした"))
-      (send *ri* :ros-wait 2.0 :spin-self t :spin t) ;; attention-check ...
-      (return-from open-fridge-door nil))
+    ;; (when (not ret)
+    ;;   (ros::ros-info "TIMEOUT: open-fridge-door");;
+    ;;   (if (and (boundp '*use-voicetext*) *use-voicetext*)
+    ;;       (cond
+    ;;        ((and (boundp '*use-english*) *use-english*)
+    ;;         (speak-jp "I could not find the refrigerator."))
+    ;;        (t (speak-jp "冷蔵庫を見つけられませんでした。")))
+    ;;     (speak-jp "れいぞうこ を みつけられません でした"))
+    ;;   (send *ri* :ros-wait 2.0 :spin-self t :spin t) ;; attention-check ...
+    ;;   (return-from open-fridge-door nil))
+
+    ;; End Commented out for merging
+
+    (approach-loop)
+    (catch-fridge-handle :wait t)
+
+    ;; 融合のときのcdsを出す
+    (setq cds (short-calc-cds-for-open-fridge))
+
+    ;; 融合のために、move-fridge-trajでgraspするまでのところを飛ばす
+    (funcall #'open-fridge-traj
+             :rarm cds 1.7 ;;(/ pi 2)
+             :rotation-axis t :radius 490
+             :wait-time 5.8 ;; t
+             )
+
+    ;; 融合のために無理やりwait
+    (unix:sleep 2)
 
     ;;move larm forward to keep the fridge door open
     (move-forward-larm :ratio ratio :wait wait)
