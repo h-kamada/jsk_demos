@@ -751,9 +751,16 @@
     ))
 
 (defun move-forward-larm (&key (ratio 1) (wait t))
-  (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
-  (send *pr2* :larm :angle-vector (float-vector 20.0 45.0 53.0 -100.0 -43.0 -60.0 0.0))
-  (send *ri* :angle-vector (send *pr2* :angle-vector) (* ratio 700))
+
+  ;; Begin Changed for merging
+  ;; (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+  ;; (send *pr2* :larm :angle-vector (float-vector 20.0 45.0 53.0 -100.0 -43.0 -60.0 0.0))
+  ;; (send *ri* :angle-vector (send *pr2* :angle-vector) (* ratio 700))
+  ;; End Changed for merging
+
+  (send *ri* :angle-vector
+        (float-vector 130.081 11.7089 25.4788 45.643 -64.9381 -45.9853 -60.0 0.000361 -23.0959 57.854 0.001561 -114.972 0.001588 -5.72958 0.000221 19.9387 23.58)
+        (* ratio 700) :larm-controller)
   (if wait
       (send *ri* :wait-interpolation))
   )
@@ -844,10 +851,16 @@
     (setq *r* res)
     (setq target-obj (car res))
     (setq 3dev (car (cdr res)))
-    ;; (setq move-dis (list (* (- (elt (send target-obj :pos) 0) 772) 0.001)
+
+    ;; (setq move-dis (list (* (- (elt (send target-obj :pos) 0) 770) 0.001)
     ;;                      (* (- (elt (send target-obj :pos) 1) 98) 0.001)))
-    (setq move-dis (list (* (- (elt (send target-obj :pos) 0) 770) 0.001)
+    ;; merging の際に、これだと進みすぎて冷蔵庫に手がぶつかるので、もう少し下がり目で動作させてみる
+
+    ;; Begin Changed by Hitoshi Kamada
+    (setq move-dis (list (* (- (elt (send target-obj :pos) 0) 785) 0.001)
                          (* (- (elt (send target-obj :pos) 1) 98) 0.001)))
+    ;; End Changed by Hitoshi Kamada
+
     ;; (send target-obj :locate (float-vector 772 98 (elt (send target-obj :pos) 2)) :world)
     (send target-obj :locate (float-vector 700 98 1100) :world)
     (setq via2 (send (send target-obj :copy-worldcoords) :translate (float-vector (- 3dev) 0 0)))
@@ -858,8 +871,12 @@
     (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
     ;; (send *ri* :go-force (elt move-dis 0) (elt move-dis 1) 0)
     (if move
-        (send *ri* :go-pos-unsafe-no-wait (elt move-dis 0) (elt move-dis 1) 0))
-    (while (> 3dev 10)
+        (progn
+          (ros::ros-info "move-dis:~A" move-dis)
+          (setq *aaa* move-dis)
+          (send *ri* :go-pos-unsafe-no-wait (elt move-dis 0) (elt move-dis 1) 0))
+      )
+    (while (> 3dev 7)
       (ros::ros-info "cur-3dev:~A" 3dev)
       (setq res (check-detection-service :type "fridge" :speak nil))
       (setq *r* res)
@@ -1164,7 +1181,7 @@
         (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
         (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
         ))
-  (pr2-tuckarm-pose use-arm :outside)
+  ;; (pr2-tuckarm-pose use-arm :outside)
   t
   )
 

@@ -8,6 +8,8 @@
 
 (setq *type* "georgia")
 
-(open-fridge-door :use-arm :larm)
-(grasp-can :use-arm :larm)
-(close-fridge :use-arm :larm)
+(defun demo ()
+  (open-fridge-door :use-arm :larm)
+  (grasp-can :use-arm :larm)
+  (close-fridge :use-arm :larm)
+  )
