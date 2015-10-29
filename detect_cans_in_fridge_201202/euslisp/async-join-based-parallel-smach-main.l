@@ -14,56 +14,97 @@
     (send goal :goal :value val)
     goal))
 
-(defun a-check (userdata)
-  (let ((executing-clients (cdr (assoc :excuting-clients userdata)))
-        )
-    (dolist (client executing-clients)
-      (send client :spin-once)
-      (case (send client :get-state)
-        ((1) ;; active-state
-         (add-to-userdata)
-         )
-        (t
-         (
-
-
-
-    t
-  )
-
-(setq a-client (instance ros::simple-action-client :init
-                         "goto_front_of_fridge" roseus_smach::Sub5Action))
-
 (defvar random-int-value nil)
 (defvar async-clients nil)
 
-(defun mk (state-name client check-func)
-  (let ((sm (instance state-machine :init))
-        st st-check st-join
-        )
-  (setq st (intern (string state-name) *keyword-package*))
-  (setq st-check (intern (string-upcase (format nil "~A-check" state-name)) *keyword-package*))
-  (setq st-join (intern (string-upcase (format nil "~A-join" state-name)) *keyword-package*))
-  (send sm :add-node (instance state :init st-check check-func))
-  (send sm :add-node (instance async-join-state :init st-join :timeout 30
-                               :remap-list '((:async . async-clients))))
-  (send sm :add-node (actionlib-client-state st client :async t :timeout 7 :retry t
-                                             :key 'convert))
-  (send (send sm :node st) :remap-list '((:goal . random-int-value)
-                                         (:async . async-clients)))
-  (send sm :goal-state (list :success :failure))
-  (send sm :add-transition st-check st t)
-  (send sm :add-transition st-check st-join nil)
-  (send sm :add-transition st-join st t)
-  (send sm :add-transition st :success t)
-  (send sm :add-transition st :failure nil)
-  (send sm :start-state st-check)
-  (send sm :arg-keys :results 'random-int-value 'async-clients)
-  sm
-  ))
+(defmacro make-check-function (user-defined-function)
+  `(let ()
+     (cond
+       ((not (functionp ',user-defined-function))
+        #'(lambda (userdata)
+            (ros::ros-info "user function not defined. Just check structure hazard.")
+            (cond
+              ((equal (car (cdr (assoc :async userdata))) nil)
+               t)
+              (t
+               nil
+               ))))
+       (t
+        #'(lambda (userdata)
+            (ros::ros-info "user function found. Exec user function.")
+            (,user-defined-function userdata)
+            t
+            )))
+     ))
 
-(defun ex ()
-  (smach-exec (mk 'a a-client 'a-check)))
+(defun a-check (userdata)
+  (ros::ros-info "a-check")
+  t
+  )
+
+(defmacro mkm (sm-name actionlib-name &optional (check-func nil))
+  `(let (st st-check st-join
+         )
+     (setq ,sm-name (instance state-machine :init))
+     (setq st (intern (string ',sm-name) *keyword-package*))
+     (setq st-check (intern (string-upcase (format nil "~A-check" ',sm-name)) *keyword-package*))
+     (setq st-join (intern (string-upcase (format nil "~A-join" ',sm-name)) *keyword-package*))
+     (setq client (instance ros::simple-action-client :init
+                            ,actionlib-name roseus_smach::Sub5Action))
+     (setq ,sm-name (instance state-machine :init))
+     (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func)))
+     (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
+                                        :remap-list '((:async . async-clients))))
+     (send ,sm-name :add-node (actionlib-client-state st client :async t :timeout 7 :retry t :key 'convert))
+     (send (send ,sm-name :node st) :remap-list '((:goal . random-int-value)
+                                                  (:async . async-clients)))
+     (send ,sm-name :goal-state (list :success :failure))
+     (send ,sm-name :add-transition st-check st t)
+     (send ,sm-name :add-transition st-check st-join nil)
+     (send ,sm-name :add-transition st-join st t)
+     (send ,sm-name :add-transition st :success t)
+     (send ,sm-name :add-transition st :failure nil)
+     (send ,sm-name :start-state st-check)
+     (send ,sm-name :arg-keys :results 'random-int-value 'async-clients)
+     ,sm-name
+     ))
+
+(defun exm (&optional arg)
+  (cond
+    (arg
+       (smach-exec (mkm a "goto_front_of_fridge")))
+    (t
+     (smach-exec (mkm a "goto_front_of_fridge" a-check)))))
+
+;; defun version
+
+;; (defun mk (state-name client check-func)
+;;   (let ((sm (instance state-machine :init))
+;;         st st-check st-join
+;;         )
+;;   (setq st (intern (string state-name) *keyword-package*))
+;;   (setq st-check (intern (string-upcase (format nil "~A-check" state-name)) *keyword-package*))
+;;   (setq st-join (intern (string-upcase (format nil "~A-join" state-name)) *keyword-package*))
+;;   (send sm :add-node (instance state :init st-check check-func))
+;;   (send sm :add-node (instance async-join-state :init st-join :timeout 30
+;;                                :remap-list '((:async . async-clients))))
+;;   (send sm :add-node (actionlib-client-state st client :async t :timeout 7 :retry t
+;;                                              :key 'convert))
+;;   (send (send sm :node st) :remap-list '((:goal . random-int-value)
+;;                                          (:async . async-clients)))
+;;   (send sm :goal-state (list :success :failure))
+;;   (send sm :add-transition st-check st t)
+;;   (send sm :add-transition st-check st-join nil)
+;;   (send sm :add-transition st-join st t)
+;;   (send sm :add-transition st :success t)
+;;   (send sm :add-transition st :failure nil)
+;;   (send sm :start-state st-check)
+;;   (send sm :arg-keys :results 'random-int-value 'async-clients)
+;;   sm
+;;   ))
+
+;; (defun ex ()
+;;   (smach-exec (mk 'a a-client 'a-check)))
 
 (defun make-sm ()
   (let ((sm (instance state-machine :init))
