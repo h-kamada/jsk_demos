@@ -5,24 +5,25 @@
 (require :state-machine-actionlib "package://roseus_smach/src/state-machine-actionlib.l")
 
 (defun start (&optional userdata)
-  (ros::ros-info "start")
+  (ros::ros-info "    Info: start function is being executed.")
   )
 
 (defun convert (val)
   (let ((goal (instance roseus_smach::Sub5ActionGoal :init)))
-    (ros::ros-info "convert to actiongoal")
+;    (ros::ros-info "    convert to actiongoal")
     (send goal :goal :value val)
     goal))
 
-(defvar random-int-value nil)
-(defvar async-clients nil)
+;; (defvar random-int-value nil)
+;; (defvar async-clients nil)
 
 (defmacro make-check-function (user-defined-function)
   `(let ()
      (cond
        ((not (functionp ',user-defined-function))
         #'(lambda (userdata)
-            (ros::ros-info "user function not defined. Just check structure hazard.")
+            (ros::ros-info "    user function not defined. Just check structure hazard.")
+;            (ros::ros-info "    userdata :~A" userdata)
             (cond
               ((equal (car (cdr (assoc :async userdata))) nil)
                t)
@@ -31,7 +32,7 @@
                ))))
        (t
         #'(lambda (userdata)
-            (ros::ros-info "user function found. Exec user function.")
+            (ros::ros-info "    user function found. Exec user function.")
             (,user-defined-function userdata)
             t
             )))
@@ -59,6 +60,9 @@
                                ,actionlib-name roseus_smach::Sub5Action))
         (setq ,sm-name (instance state-machine :init))
         (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func)))
+        ;; checkにおける remapはuserdata情報をcheckするために必要
+        (send (send ,sm-name :node st-check) :remap-list '((:async . async-clients)))
+
         (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
                                            :remap-list '((:async . async-clients))))
         (send ,sm-name :add-node (actionlib-client-state st client :async t :timeout 7 :retry t :key 'convert))
@@ -155,13 +159,15 @@
         ;;                                "close_fridge" roseus_smach::Sub5Action))
 
         num-value
-        async-clients)
+       ; async-clients
+        )
 
 
     (send sm :add-node (instance state :init :start 'start))
 
     (send sm :add-node
-          (make-hazard-check-state-machine goto-front-of-fridge "goto_front_of_fridge")
+          (instance state :init :goto
+                    (make-hazard-check-state-machine goto-front-of-fridge "goto_front_of_fridge"))
           )
     ;; (send goto-front-of-fridge-sm :add-node (instance state :init :goto-front-of-fridge-check 'goto-front-of-fridge-check))
     ;; (send goto-front-of-fridge-sm :add-node (instance async-join-state :init :join :timeout 30 :remap-list '((:async . async-clients))))
@@ -174,7 +180,8 @@
     ;; (send sm :add-node goto-front-of-fridge-sm)
 
     (send sm :add-node
-          (make-hazard-check-state-machine base-go-to-fridge "base_go_to_fridge")
+          (instance state :init :base
+                    (make-hazard-check-state-machine base-go-to-fridge "base_go_to_fridge"))
           )
     ;; (send base-go-to-fridge-sm :add-node (instance state :init :base-go-to-fridge-check 'base-go-to-fridge-check))
     ;; (send base-go-to-fridge-sm :add-node (instance state :init :base-go-to-fridge-join 'goto-
@@ -231,15 +238,12 @@
     ;;        :close-fridge close-fridge-client :async t
     ;;        :timeout 7 :retry t :key 'convert))
 
-    (ros::ros-info "hoge")
     (send sm :arg-keys :results 'random-int-value 'async-clients)
     (send sm :start-state :start)
     (send sm :goal-state (list :success))
-    (send sm :add-transition :start goto-front-of-fridge t)
-    (ros::ros-info "fuga")
-    (send sm :add-transition goto-front-of-fridge base-go-to-fridge t)
-    (ros::ros-info "1a")
-    (send sm :add-transition base-go-to-fridge :success t)
+    (send sm :add-transition :start :goto t)
+    (send sm :add-transition :goto :base :success)
+    (send sm :add-transition :base :success :success)
     ;; (send sm :add-transition :start :base-go-to-fridge t)
     ;; (send sm :add-transition :goto-front-of-fridge :join t)
     ;; (send sm :add-transition :base-go-to-fridge :join t)
