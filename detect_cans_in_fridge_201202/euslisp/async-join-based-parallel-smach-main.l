@@ -10,28 +10,91 @@
   (let (start-time ret clients part-async-client-lst)
     (send self :remap userdata :invert nil)
     (setq start-time (ros::time-now))
-    (setq clients (cdr (assoc :async userdata)))
-    (when (atom clients)
-      (setq clients (list clients)))
     (setq part-async-client-lst (cdr (assoc :part-sync userdata)))
     (cond
-      
-
-    (warning-message 2 "waiting action client: ~A~%" clients)
-    (send-all clients :spin-once)
-    (if (member nil (send-all clients :wait-for-result :timeout timeout))
-      (setq ret nil) (setq ret t))
-    (warn "ret: ~A~%" ret)
-    (set-alist :results (send-all clients :get-result) userdata)
-    (warn "result: ~A~%" (send-all clients :get-result))
+      ((null part-async-client-lst) ; normal mode
+       (setq clients (cdr (assoc :async userdata)))
+       (when (atom clients)
+         (setq clients (list clients)))
+       (warning-message 2 "waiting action client: ~A~%" clients)
+       (send-all clients :spin-once)
+       (if (member nil (send-all clients :wait-for-result :timeout timeout))
+           (setq ret nil) (setq ret t))
+       (warn "ret: ~A~%" ret)
+       (set-alist :results (send-all clients :get-result) userdata)
+       (warn "result: ~A~%" (send-all clients :get-result))
+       )
+      (t ; partly join
+       (warning-message 2 "<partly join>  waiting action client: ~A~%" partly-async-client-lst)
+       (send-all partly-async-client-lst :spin-once)
+       (if (member nil (send-all partly-async-client-lst :wait-for-result :timeout timeout))
+           (setq ret nil) (setq ret t))
+       (warn "ret: ~A~%" ret)
+       (set-alist :results (send-all partly-async-client-lst :get-result) userdata)
+       (warn "result: ~A~%" (send-all partly-async-client-lst :get-result))
+         ))
     (send self :remap userdata :invert t)
     (return-from :execute ret))))
 
-(defun delete-client (userdata)
-  (let 
 
+(defun actionlib-client-state
+  (name client my-controller-lst
+   &key (timeout 10) (retry nil) (key #'identity) (return-success :succeeded) (return-fail :failed)
+        (async nil) (return-async t))
+  (send client :wait-for-server)
+  (instance state :init name
+   ;; main loop
+   `(lambda (userdata)
+      (let ((start (ros::time-now)) async-clients)
+  (send ,client :send-goal
+        (funcall (quote ,key) (cdr (assoc :goal userdata))))
+  (if ,async
+    (progn
+      (setq async-clients (cdr (assoc :async userdata)))
+      (set-alist :async (flatten (list async-clients ,client)) userdata)
 
+      ;; add client to controller-lst in userdata
+      (if (not (null ,my-controller-lst))
+          (progn
+            (dolist (controller ,my-controller-lst)
+              (let (client-lst)
+                (setq client-lst (cdr (assoc controller userdata)))
+                (set-alist controller (flatten (list client-lst ,client)) userdata)
+              ))))
 
+     (ros::sleep)
+     (send ,client :spin-once)
+     ,return-async)
+  (while (ros::ok)
+    (ros::sleep)
+    (send ,client :spin-once)
+    ;;
+    (cond
+     ((eq (send ,client :get-state) actionlib_msgs::GoalStatus::*SUCCEEDED*)
+       (return ,return-success))
+      ((eq (send ,client :get-state) actionlib_msgs::GoalStatus::*ABORTED*)
+       (if ,retry
+     (send ,client :send-goal
+           (funcall (quote ,key) (cdr (assoc :goal userdata))))
+         (return ,return-fail)))
+      ((member (send ,client :get-state)
+         (list actionlib_msgs::GoalStatus::*PREEMPTED*
+         actionlib_msgs::GoalStatus::*RECALLED*
+         actionlib_msgs::GoalStatus::*REJECTED*))
+       (return ,return-fail))
+      ((member (send ,client :get-state)
+         (list actionlib_msgs::GoalStatus::*ACTIVE*
+          actionlib_msgs::GoalStatus::*PENDING*))
+       ;; user cancel
+       (if (and (vectorp (cdr (assoc :cancel userdata)))
+          (elt (cdr (assoc :cancel userdata)) 0))
+     (send ,client :cancel-goal))
+       ;; time out
+       (if (and (numberp ,timeout)
+          (< ,timeout (send (ros::time- (ros::time-now) start) :to-sec)))
+     (send ,client :cancel-goal))))
+    )))))
+  )
 
 (defun start (&optional userdata)
   (ros::ros-info "    Info: start function is being executed.")
@@ -54,6 +117,7 @@
         (lgripper-client-lst (cdr (assoc :lgripper userdata)))
         (torso-client-lst (cdr (assoc :torso userdata)))
         )
+    ;; checkの一番最初にupdateが呼ばれdeleteするので、join直後にdeleteしなくてもよい
     (dolist (client async-client-lst)
       (send client :spin-once)
       (case (send client :get-state)
@@ -101,17 +165,23 @@
               ((equal (car (cdr (assoc :async userdata))) nil)
                t)
               (t ;; There are some clients waiting result.
-               (dolist (controller ,my-controller-lst)
-                 (let ((client-lst (cdr (assoc controller userdata)))
-                       (part-async-client-lst (cdr (assoc :part-async userdata)))
-                       )
-                 (cond
-                   ((null (car client-lst))
-                    ;;no clients
-                    nil)
-                   (t
-                    (set-alist :part-async (flatten (list part-async-client-lst client-lst)) userdata)
-                    ))))
+
+               ;; currently transition to join state if controller already exists.
+               (let ((part-async-client-lst (cdr (assoc :part-async userdata)))
+                     )
+                 (dolist (controller ,my-controller-lst)
+                   (let ((client-lst (cdr (assoc controller userdata)))
+                         )
+                     (cond
+                      ((null (car client-lst))
+                       ;;no clients
+                       nil)
+                      (t
+                       (setq part-async-client-lst (append part-async-client-lst client-lst))
+                       ))))
+                 (setq part-async-client-lst (remove-duplicates part-async-client-lst))
+                 (set-alist :part-async part-async-client-lst userdata)
+                 )
                nil
                ))))
        (t
@@ -125,12 +195,37 @@
             )))
      ))
 
-(defun a-check (userdata)
-  (ros::ros-info "a-check")
-  t
-  )
+;; (defun a-check (userdata)
+;;   (ros::ros-info "a-check")
+;;   t
+;;   )
 
-(defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (check-func nil) (my-hazard-lst nil))
+(defun make-hazard-remap-lst (my-controller-lst)
+  (let ((remap-lst (list (:goal . random-int-value)))
+        )
+    (dolist (controller my-controller-lst)
+      (case controller
+        ((:base)
+         (setq remap-lst (append remap-lst '((:base . base-clients)))))
+        ((:head)
+         (setq remap-lst (append remap-lst '((:head . head-clients)))))
+        ((:rarm)
+         (setq remap-lst (append remap-lst '((:rarm . rarm-clients)))))
+        ((:larm)
+         (setq remap-lst (append remap-lst '((:larm . larm-clients)))))
+        ((:rgripper)
+         (setq remap-lst (append remap-lst '((:rgripper . rgripper-clients)))))
+        ((:lgripper)
+         (setq remap-lst (append remap-lst '((:lgripper . lgripper-clients)))))
+        ((:torso)
+         (setq remap-lst (append remap-lst '((:torso . torso-clients)))))
+        ))
+    remap-lst
+    ))
+
+
+
+(defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (check-func nil) (my-controller-lst nil))
   `(let (st st-check st-join
          )
      (cond
@@ -146,15 +241,25 @@
         (setq client (instance ros::simple-action-client :init
                                ,actionlib-name roseus_smach::Sub5Action))
         (setq ,sm-name (instance state-machine :init))
-        (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func ,my-hazard-lst)))
+        (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func ,my-controller-lst)))
         ;; checkにおける remapはuserdata情報をcheckするために必要
-        (send (send ,sm-name :node st-check) :remap-list '((:async . async-clients)))
+        (send (send ,sm-name :node st-check) :remap-list '((:async . async-clients)
+                                                           (:part-async . part-async-clients)
+                                                           ))
 
         (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
-                                           :remap-list '((:async . async-clients))))
-        (send ,sm-name :add-node (actionlib-client-state st client :async t :timeout 7 :retry t :key 'convert))
-        (send (send ,sm-name :node st) :remap-list '((:goal . random-int-value)
-                                                     (:async . async-clients)))
+                                           :remap-list '((:async . async-clients)
+                                                         (:part-async . part-async-clients)
+                                                         )))
+        (send ,sm-name :add-node (actionlib-client-state st client ,my-controller-lst :async t :timeout 7 :retry t :key 'convert))
+        (cond
+         ((null ,my-controller-lst)
+          (send (send ,sm-name :node st) :remap-list '((:goal . random-int-value)
+                                                       (:async . async-clients)))
+          )
+         (t
+          (send (send ,sm-name :node st) :remap-list (make-hazard-remap-lst ,my-controller-lst))
+          ))
         (send ,sm-name :goal-state (list :success :failure))
         (send ,sm-name :add-transition st-check st t)
         (send ,sm-name :add-transition st-check st-join nil)
@@ -352,3 +457,21 @@
 (defun demo ()
   (make-sm)
   (smach-exec *sm*))
+
+(warn "~%")
+(warn "~%")
+(warn "Caution######################################################~%")
+(warn "async-join-state class differs from original one.~%")
+(warn "actionlib-client-state function differs from original one.~%")
+(warn "#############################################################~%")
+(warn "~%")
+(warn "~%")
+
+
+
+
+
+
+
+
+
