@@ -4,6 +4,35 @@
 (ros::roseus "async_join_state_machine_based_fridge_demo")
 (require :state-machine-actionlib "package://roseus_smach/src/state-machine-actionlib.l")
 
+(defmethod async-join-state
+ (:execute
+  (userdata &key (step nil))
+  (let (start-time ret clients part-async-client-lst)
+    (send self :remap userdata :invert nil)
+    (setq start-time (ros::time-now))
+    (setq clients (cdr (assoc :async userdata)))
+    (when (atom clients)
+      (setq clients (list clients)))
+    (setq part-async-client-lst (cdr (assoc :part-sync userdata)))
+    (cond
+      
+
+    (warning-message 2 "waiting action client: ~A~%" clients)
+    (send-all clients :spin-once)
+    (if (member nil (send-all clients :wait-for-result :timeout timeout))
+      (setq ret nil) (setq ret t))
+    (warn "ret: ~A~%" ret)
+    (set-alist :results (send-all clients :get-result) userdata)
+    (warn "result: ~A~%" (send-all clients :get-result))
+    (send self :remap userdata :invert t)
+    (return-from :execute ret))))
+
+(defun delete-client (userdata)
+  (let 
+
+
+
+
 (defun start (&optional userdata)
   (ros::ros-info "    Info: start function is being executed.")
   )
@@ -14,24 +43,82 @@
     (send goal :goal :value val)
     goal))
 
-;; (defvar random-int-value nil)
-;; (defvar async-clients nil)
+(defun update-client-lst (userdata)
+  (let ((async-client-lst (cdr (assoc :async userdata)))
+        (part-async-client-lst (cdr (assoc :part-sync userdata)))
+        (base-client-lst (cdr (assoc :base userdata)))
+        (head-client-lst (cdr (assoc :head userdata)))
+        (rarm-client-lst (cdr (assoc :rarm userdata)))
+        (larm-client-lst (cdr (assoc :larm userdata)))
+        (rgripper-client-lst (cdr (assoc :rgripper userdata)))
+        (lgripper-client-lst (cdr (assoc :lgripper userdata)))
+        (torso-client-lst (cdr (assoc :torso userdata)))
+        )
+    (dolist (client async-client-lst)
+      (send client :spin-once)
+      (case (send client :get-state)
+        ((actionlib_msgs::GoalStatus::*active*)
+         ;; nothing
+         )
+        (t
+         ;; delete the client from all lists
+         (setq async-client-lst (remove client async-client-lst)
+               part-async-client-lst (remove client part-async-client-lst)
+               base-client-lst (remove client base-client-lst)
+               head-client-lst (remove client head-client-lst)
+               rarm-client-lst (remove client rarm-client-lst)
+               larm-client-lst (remove client larm-client-lst)
+               rgripper-client-lst (remove client rgripper-client-lst)
+               lgripper-client-lst (remove client lgripper-client-lst)
+               torso-client-lst (remove client torso-client-lst)
+               )
+         ;; set those to userdata
+         (set-alist :async async-client-lst userdata)
+         (set-alist :part-async part-async-client-lst userdata)
+         (set-alist :base base-client-lst userdata)
+         (set-alist :head head-client-lst userdata)
+         (set-alist :rarm rarm-client-lst userdata)
+         (set-alist :larm larm-client-lst userdata)
+         (set-alist :rgripper rgripper-client-lst userdata)
+         (set-alist :lgripper lgripper-client-lst userdata)
+         (set-alist :torso torso-client-lst userdata)
+         )))
+    ))
 
-(defmacro make-check-function (user-defined-function)
+
+
+(defmacro make-check-function (user-defined-function my-controller-lst)
   `(let ()
      (cond
        ((not (functionp ',user-defined-function))
         #'(lambda (userdata)
-            (ros::ros-info "    user function not defined. Just check structure hazard.")
-;            (ros::ros-info "    userdata :~A" userdata)
+            ;; update
+            (update-client-lst userdata)
+
+            (ros::ros-info "    user function not defined. Check structure hazard.")
+            ;; (ros::ros-info "    userdata :~A" userdata)
             (cond
               ((equal (car (cdr (assoc :async userdata))) nil)
                t)
-              (t
+              (t ;; There are some clients waiting result.
+               (dolist (controller ,my-controller-lst)
+                 (let ((client-lst (cdr (assoc controller userdata)))
+                       (part-async-client-lst (cdr (assoc :part-async userdata)))
+                       )
+                 (cond
+                   ((null (car client-lst))
+                    ;;no clients
+                    nil)
+                   (t
+                    (set-alist :part-async (flatten (list part-async-client-lst client-lst)) userdata)
+                    ))))
                nil
                ))))
        (t
         #'(lambda (userdata)
+            ;; update
+            (update-client-lst userdata)
+
             (ros::ros-info "    user function found. Exec user function.")
             (,user-defined-function userdata)
             t
@@ -43,7 +130,7 @@
   t
   )
 
-(defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (check-func nil))
+(defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (check-func nil) (my-hazard-lst nil))
   `(let (st st-check st-join
          )
      (cond
@@ -59,7 +146,7 @@
         (setq client (instance ros::simple-action-client :init
                                ,actionlib-name roseus_smach::Sub5Action))
         (setq ,sm-name (instance state-machine :init))
-        (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func)))
+        (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func ,my-hazard-lst)))
         ;; checkにおける remapはuserdata情報をcheckするために必要
         (send (send ,sm-name :node st-check) :remap-list '((:async . async-clients)))
 
