@@ -10,8 +10,8 @@
   (ros::ros-info "goto-front-of-fridge callback func called")
 
   ;;  (goto-front-of-fridge)
-  (ros::ros-info "wait 1s")
-  (unix:sleep 1)
+  (ros::ros-info "wait 0.5s")
+  (unix:usleep 500)
   (send server :set-succeeded (send server :result :value 1))
   )
 

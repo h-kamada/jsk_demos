@@ -14,7 +14,7 @@
     (setq *a* userdata)
     (setq start-time (ros::time-now))
     (setq part-async-client-lst (cdr (assoc :part-async userdata)))
-;    (ros::ros-info "part-async: ~A" part-async-client-lst)
+    (ros::ros-info "part-async: ~A" part-async-client-lst)
     (cond
       ((null part-async-client-lst) ; normal mode
        (ros::ros-info "normal async join")
@@ -160,6 +160,36 @@
     (warn "<update> userdata: ~A~%" userdata)
     ))
 
+(defun set-part-async-client-lst (userdata my-controller-lst)
+  (let ((part-async-client-lst (cdr (assoc :part-async userdata))) ; nilのはずではあるが一応
+        hazard-assoc-lst
+        )
+    (setq hazard-assoc-lst
+          '((:base :rgripper :lgripper)
+            (:head)
+            (:rarm :rgripper :base)
+            (:larm :lgripper :base)
+            (:rgripper :rarm :base :torso)
+            (:lgripper :larm :base :torso)
+            (:torso :rgripper :lgripper)
+            ))
+    (dolist (controller my-controller-lst)
+      (dolist (ctr (assoc controller hazard-assoc-lst))
+        (let ((client-lst (cdr (assoc ctr userdata))))
+          (cond
+           ((null (car client-lst))
+            ;;no clients
+            )
+           (t
+            (setq part-async-client-lst (append part-async-client-lst client-lst))
+            )))))
+    (setq part-async-client-lst (remove-duplicates part-async-client-lst))
+    (ros::ros-info "    <check> userdata:~A" userdata)
+    (set-alist :part-async part-async-client-lst userdata)
+    (ros::ros-info "    <check> userdata:~A" userdata)
+    ))
+
+
 
 
 (defmacro make-check-function (user-defined-function my-controller-lst)
@@ -169,38 +199,24 @@
         #'(lambda (userdata)
             ;; update
             (update-client-lst userdata)
-
             (ros::ros-info "    user function not defined. Check structure hazard.")
             (cond
               ((equal (car (cdr (assoc :async userdata))) nil)
                t)
               (t ;; There are some clients waiting result.
-
-               ;; currently transition to join state if controller already exists.
-               (let ((part-async-client-lst (cdr (assoc :part-async userdata)))
-                     )
-                 (dolist (controller ,my-controller-lst)
-                   (let ((client-lst (cdr (assoc controller userdata)))
-                         )
-                     (cond
-                      ((null (car client-lst))
-                       ;;no clients
-                       nil)
-                      (t
-                       (setq part-async-client-lst (append part-async-client-lst client-lst))
-                       ))))
-                 (setq part-async-client-lst (remove-duplicates part-async-client-lst))
-                 (ros::ros-info "    <check> userdata:~A" userdata)
-                 (set-alist :part-async part-async-client-lst userdata)
-                 (ros::ros-info "    <check> userdata:~A" userdata)
+               (set-part-async-client-lst userdata ',my-controller-lst)
+               (let ((part-async-client-lst (assoc :part-async userdata)))
+                 (cond
+                  ((null part-async-client-lst)
+                   t)
+                  (t
+                   nil))
                  )
-               nil
                ))))
        (t
         #'(lambda (userdata)
             ;; update
             (update-client-lst userdata)
-
             (ros::ros-info "    user function found. Exec user function.")
             (,user-defined-function userdata)
             t
@@ -279,12 +295,12 @@
     (send sm :add-node
           (instance state :init :goto
                     (make-hazard-check-state-machine goto-front-of-fridge "goto_front_of_fridge"
-                                                     '(:rarm :rgripper)
+                                                     '(:rarm :rgripper :larm :lgripper)
                                                      )))
     (send sm :add-node
           (instance state :init :base
                     (make-hazard-check-state-machine base-go-to-fridge "base_go_to_fridge"
-                                                     '(:larm :rgripper)
+                                                     '(:base :rarm)
                                                      )))
     (send sm :arg-keys
           'async-clients 'part-async-clients 'base-clients
