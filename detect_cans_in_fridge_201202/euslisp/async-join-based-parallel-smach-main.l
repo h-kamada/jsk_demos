@@ -51,7 +51,9 @@
   (if ,async
     (progn
       (setq async-clients (cdr (assoc :async userdata)))
+      (ros::ros-info "<exec> userdata: ~A" userdata)
       (set-alist :async (flatten (list async-clients ,client)) userdata)
+      (ros::ros-info "<exec> userdata: ~A" userdata)
 
       ;; add client to controller-lst in userdata
       (if (not (null ,my-controller-lst))
@@ -118,13 +120,12 @@
         (torso-client-lst (cdr (assoc :torso userdata)))
         )
     ;; checkの一番最初にupdateが呼ばれdeleteするので、join直後にdeleteしなくてもよい
+    (warn "<update> userdata: ~A~%" userdata)
     (dolist (client async-client-lst)
       (send client :spin-once)
-      (case (send client :get-state)
-        ((actionlib_msgs::GoalStatus::*active*)
-         ;; nothing
-         )
-        (t
+      (case (send client :get-goal-state)
+        ((ros::*simple-goal-state-done*)
+         (ros::ros-info "client(~A)'s goal is achived. Delete the client." client)
          ;; delete the client from all lists
          (setq async-client-lst (remove client async-client-lst)
                part-async-client-lst (remove client part-async-client-lst)
@@ -135,18 +136,22 @@
                rgripper-client-lst (remove client rgripper-client-lst)
                lgripper-client-lst (remove client lgripper-client-lst)
                torso-client-lst (remove client torso-client-lst)
-               )
-         ;; set those to userdata
-         (set-alist :async async-client-lst userdata)
-         (set-alist :part-async part-async-client-lst userdata)
-         (set-alist :base base-client-lst userdata)
-         (set-alist :head head-client-lst userdata)
-         (set-alist :rarm rarm-client-lst userdata)
-         (set-alist :larm larm-client-lst userdata)
-         (set-alist :rgripper rgripper-client-lst userdata)
-         (set-alist :lgripper lgripper-client-lst userdata)
-         (set-alist :torso torso-client-lst userdata)
-         )))
+               ))
+        (t
+         ;; nothing
+         )
+        ))
+    ;; set those to userdata
+    (set-alist :async async-client-lst userdata)
+    (set-alist :part-async part-async-client-lst userdata)
+    (set-alist :base base-client-lst userdata)
+    (set-alist :head head-client-lst userdata)
+    (set-alist :rarm rarm-client-lst userdata)
+    (set-alist :larm larm-client-lst userdata)
+    (set-alist :rgripper rgripper-client-lst userdata)
+    (set-alist :lgripper lgripper-client-lst userdata)
+    (set-alist :torso torso-client-lst userdata)
+    (warn "<update> userdata: ~A~%" userdata)
     ))
 
 
@@ -160,7 +165,7 @@
             (update-client-lst userdata)
 
             (ros::ros-info "    user function not defined. Check structure hazard.")
-            ;; (ros::ros-info "    userdata :~A" userdata)
+            (ros::ros-info "    userdata:~A" userdata)
             (cond
               ((equal (car (cdr (assoc :async userdata))) nil)
                t)
@@ -223,8 +228,6 @@
     remap-lst
     ))
 
-
-
 (defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (check-func nil) (my-controller-lst nil))
   `(let (st st-check st-join
          )
@@ -255,6 +258,7 @@
         (cond
          ((null ,my-controller-lst)
           (send (send ,sm-name :node st) :remap-list '((:goal . random-int-value)
+                                                       (:part-async . part-async-clients)
                                                        (:async . async-clients)))
           )
          (t
@@ -267,7 +271,7 @@
         (send ,sm-name :add-transition st :success t)
         (send ,sm-name :add-transition st :failure nil)
         (send ,sm-name :start-state st-check)
-        (send ,sm-name :arg-keys :results 'random-int-value 'async-clients)
+        (send ,sm-name :arg-keys :results 'random-int-value 'async-clients 'part-async-clients)
         ,sm-name
      ))))
 
@@ -317,12 +321,37 @@
           (instance state :init :goto
                     (make-hazard-check-state-machine goto-front-of-fridge "goto_front_of_fridge"))
           )
+    ;; (send (send sm :node :goto) :remap-list
+    ;;       '((:goal . random-int-value)
+    ;;         (:async . async-clients)
+    ;;         (:part-async . part-async-clients)
+    ;;         (:base . base-clients)
+    ;;         (:head . head-clients)
+    ;;         (:rarm . rarm-clients)
+    ;;         (:larm . larm-clients)
+    ;;         (:rgripper . rgripper-clients)
+    ;;         (:lgripper . lgripper-clients)
+    ;;         (:torso . torso-clients)))
     (send sm :add-node
           (instance state :init :base
                     (make-hazard-check-state-machine base-go-to-fridge "base_go_to_fridge"))
           )
+    ;; (send (send sm :node :base) :remap-list
+    ;;       '((:goal . random-int-value)
+    ;;         (:async . async-clients)
+    ;;         (:part-async . part-async-clients)
+    ;;         (:base . base-clients)
+    ;;         (:head . head-clients)
+    ;;         (:rarm . rarm-clients)
+    ;;         (:larm . larm-clients)
+    ;;         (:rgripper . rgripper-clients)
+    ;;         (:lgripper . lgripper-clients)
+    ;;         (:torso . torso-clients)))
 
-    (send sm :arg-keys :results 'random-int-value 'async-clients 'part-async-clients)
+    (send sm :arg-keys :results 'random-int-value 'async-clients 'part-async-clients
+          'base-clients 'head-clients 'rarm-clients 'larm-clients 'rgripper-clients
+          'lgripper-clients 'torso-clients
+          )
     (send sm :start-state :start)
     (send sm :goal-state (list :success))
     (send sm :add-transition :start :goto t)
@@ -341,6 +370,7 @@
 (warn "Caution######################################################~%")
 (warn "async-join-state class differs from original one.~%")
 (warn "actionlib-client-state function differs from original one.~%")
+(warn "ros::simple-action-client differs from original one. <--- changed raw data ~%")
 (warn "#############################################################~%")
 (warn "~%")
 (warn "~%")

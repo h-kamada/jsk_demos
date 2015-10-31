@@ -10,8 +10,9 @@
   (ros::ros-info "goto-front-of-fridge callback func called")
 
   ;;  (goto-front-of-fridge)
-
-  (send server :set-succeeded (send server :result))
+  (ros::ros-info "wait 10s")
+  (unix:sleep 10)
+  (send server :set-succeeded (send server :result :value 1))
   )
 
 (setq s (instance ros::simple-action-server :init
