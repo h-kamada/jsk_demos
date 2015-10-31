@@ -8,11 +8,16 @@
  (:execute
   (userdata &key (step nil))
   (let (start-time ret clients part-async-client-lst)
+    (ros::ros-info "userdata:~A" userdata)
     (send self :remap userdata :invert nil)
+    (ros::ros-info "hogehoge userdata:~A" userdata)
+    (setq *a* userdata)
     (setq start-time (ros::time-now))
-    (setq part-async-client-lst (cdr (assoc :part-sync userdata)))
+    (setq part-async-client-lst (cdr (assoc :part-async userdata)))
+;    (ros::ros-info "part-async: ~A" part-async-client-lst)
     (cond
       ((null part-async-client-lst) ; normal mode
+       (ros::ros-info "normal async join")
        (setq clients (cdr (assoc :async userdata)))
        (when (atom clients)
          (setq clients (list clients)))
@@ -25,13 +30,13 @@
        (warn "result: ~A~%" (send-all clients :get-result))
        )
       (t ; partly join
-       (warning-message 2 "<partly join>  waiting action client: ~A~%" partly-async-client-lst)
-       (send-all partly-async-client-lst :spin-once)
-       (if (member nil (send-all partly-async-client-lst :wait-for-result :timeout timeout))
+       (warning-message 2 "<part async join> waiting action client:~A" part-async-client-lst)
+       (send-all part-async-client-lst :spin-once)
+       (if (member nil (send-all part-async-client-lst :wait-for-result :timeout timeout))
            (setq ret nil) (setq ret t))
        (warn "ret: ~A~%" ret)
-       (set-alist :results (send-all partly-async-client-lst :get-result) userdata)
-       (warn "result: ~A~%" (send-all partly-async-client-lst :get-result))
+       (set-alist :results (send-all part-async-client-lst :get-result) userdata)
+       (warn "result: ~A~%" (send-all part-async-client-lst :get-result))
          ))
     (send self :remap userdata :invert t)
     (return-from :execute ret))))
@@ -56,9 +61,10 @@
       (ros::ros-info "<exec> userdata: ~A" userdata)
 
       ;; add client to controller-lst in userdata
-      (if (not (null ,my-controller-lst))
+      (ros::ros-info "<exec> my-controller-lst: ~A" (car ',my-controller-lst))
+      (if (not (null ',my-controller-lst))
           (progn
-            (dolist (controller ,my-controller-lst)
+            (dolist (controller ',my-controller-lst)
               (let (client-lst)
                 (setq client-lst (cdr (assoc controller userdata)))
                 (set-alist controller (flatten (list client-lst ,client)) userdata)
@@ -165,7 +171,6 @@
             (update-client-lst userdata)
 
             (ros::ros-info "    user function not defined. Check structure hazard.")
-            (ros::ros-info "    userdata:~A" userdata)
             (cond
               ((equal (car (cdr (assoc :async userdata))) nil)
                t)
@@ -185,7 +190,9 @@
                        (setq part-async-client-lst (append part-async-client-lst client-lst))
                        ))))
                  (setq part-async-client-lst (remove-duplicates part-async-client-lst))
+                 (ros::ros-info "    <check> userdata:~A" userdata)
                  (set-alist :part-async part-async-client-lst userdata)
+                 (ros::ros-info "    <check> userdata:~A" userdata)
                  )
                nil
                ))))
@@ -200,14 +207,9 @@
             )))
      ))
 
-;; (defun a-check (userdata)
-;;   (ros::ros-info "a-check")
-;;   t
-;;   )
-
-(defun make-hazard-remap-lst (my-controller-lst)
-  (let ((remap-lst (list (:goal . random-int-value)))
-        )
+(defun make-hazard-remap-lst (&optional my-controller-lst)
+  (let ((remap-lst '((:async . async-clients)
+                     (:part-async . part-async-clients))))
     (dolist (controller my-controller-lst)
       (case controller
         ((:base)
@@ -228,7 +230,7 @@
     remap-lst
     ))
 
-(defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (check-func nil) (my-controller-lst nil))
+(defmacro make-hazard-check-state-machine (sm-name actionlib-name &optional (my-controller-lst nil) (check-func nil))
   `(let (st st-check st-join
          )
      (cond
@@ -237,6 +239,7 @@
         ,sm-name
         )
        (t
+        (ros::ros-info "mycon:~A" ,my-controller-lst)
         (setq ,sm-name (instance state-machine :init))
         (setq st (intern (string ',sm-name) *keyword-package*))
         (setq st-check (intern (string-upcase (format nil "~A-check" ',sm-name)) *keyword-package*))
@@ -245,25 +248,15 @@
                                ,actionlib-name roseus_smach::Sub5Action))
         (setq ,sm-name (instance state-machine :init))
         (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func ,my-controller-lst)))
-        ;; checkにおける remapはuserdata情報をcheckするために必要
-        (send (send ,sm-name :node st-check) :remap-list '((:async . async-clients)
-                                                           (:part-async . part-async-clients)
-                                                           ))
+
+        (send (send ,sm-name :node st-check) :remap-list (make-hazard-remap-lst ,my-controller-lst))
 
         (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
-                                           :remap-list '((:async . async-clients)
-                                                         (:part-async . part-async-clients)
-                                                         )))
+                                           :remap-list (make-hazard-remap-lst)))
+
         (send ,sm-name :add-node (actionlib-client-state st client ,my-controller-lst :async t :timeout 7 :retry t :key 'convert))
-        (cond
-         ((null ,my-controller-lst)
-          (send (send ,sm-name :node st) :remap-list '((:goal . random-int-value)
-                                                       (:part-async . part-async-clients)
-                                                       (:async . async-clients)))
-          )
-         (t
-          (send (send ,sm-name :node st) :remap-list (make-hazard-remap-lst ,my-controller-lst))
-          ))
+        (send (send ,sm-name :node st) :remap-list (make-hazard-remap-lst ,my-controller-lst))
+
         (send ,sm-name :goal-state (list :success :failure))
         (send ,sm-name :add-transition st-check st t)
         (send ,sm-name :add-transition st-check st-join nil)
@@ -271,46 +264,12 @@
         (send ,sm-name :add-transition st :success t)
         (send ,sm-name :add-transition st :failure nil)
         (send ,sm-name :start-state st-check)
-        (send ,sm-name :arg-keys :results 'random-int-value 'async-clients 'part-async-clients)
+        (send ,sm-name :arg-keys
+          'async-clients 'part-async-clients 'base-clients
+          'head-clients 'rarm-clients 'larm-clients
+          'rgripper-clients 'lgripper-clients 'torso-clients)
         ,sm-name
      ))))
-
-(defun exm (&optional arg)
-  (cond
-    (arg
-       (smach-exec (make-hazard-check-state-machine a "goto_front_of_fridge")))
-    (t
-     (smach-exec (make-hazard-check-state-machine a "goto_front_of_fridge" a-check)))))
-
-;; defun version
-
-;; (defun mk (state-name client check-func)
-;;   (let ((sm (instance state-machine :init))
-;;         st st-check st-join
-;;         )
-;;   (setq st (intern (string state-name) *keyword-package*))
-;;   (setq st-check (intern (string-upcase (format nil "~A-check" state-name)) *keyword-package*))
-;;   (setq st-join (intern (string-upcase (format nil "~A-join" state-name)) *keyword-package*))
-;;   (send sm :add-node (instance state :init st-check check-func))
-;;   (send sm :add-node (instance async-join-state :init st-join :timeout 30
-;;                                :remap-list '((:async . async-clients))))
-;;   (send sm :add-node (actionlib-client-state st client :async t :timeout 7 :retry t
-;;                                              :key 'convert))
-;;   (send (send sm :node st) :remap-list '((:goal . random-int-value)
-;;                                          (:async . async-clients)))
-;;   (send sm :goal-state (list :success :failure))
-;;   (send sm :add-transition st-check st t)
-;;   (send sm :add-transition st-check st-join nil)
-;;   (send sm :add-transition st-join st t)
-;;   (send sm :add-transition st :success t)
-;;   (send sm :add-transition st :failure nil)
-;;   (send sm :start-state st-check)
-;;   (send sm :arg-keys :results 'random-int-value 'async-clients)
-;;   sm
-;;   ))
-
-;; (defun ex ()
-;;   (smach-exec (mk 'a a-client 'a-check)))
 
 (defun make-sm ()
   (let ((sm (instance state-machine :init))
@@ -319,45 +278,23 @@
     (send sm :add-node (instance state :init :start 'start))
     (send sm :add-node
           (instance state :init :goto
-                    (make-hazard-check-state-machine goto-front-of-fridge "goto_front_of_fridge"))
-          )
-    ;; (send (send sm :node :goto) :remap-list
-    ;;       '((:goal . random-int-value)
-    ;;         (:async . async-clients)
-    ;;         (:part-async . part-async-clients)
-    ;;         (:base . base-clients)
-    ;;         (:head . head-clients)
-    ;;         (:rarm . rarm-clients)
-    ;;         (:larm . larm-clients)
-    ;;         (:rgripper . rgripper-clients)
-    ;;         (:lgripper . lgripper-clients)
-    ;;         (:torso . torso-clients)))
+                    (make-hazard-check-state-machine goto-front-of-fridge "goto_front_of_fridge"
+                                                     '(:rarm :rgripper)
+                                                     )))
     (send sm :add-node
           (instance state :init :base
-                    (make-hazard-check-state-machine base-go-to-fridge "base_go_to_fridge"))
-          )
-    ;; (send (send sm :node :base) :remap-list
-    ;;       '((:goal . random-int-value)
-    ;;         (:async . async-clients)
-    ;;         (:part-async . part-async-clients)
-    ;;         (:base . base-clients)
-    ;;         (:head . head-clients)
-    ;;         (:rarm . rarm-clients)
-    ;;         (:larm . larm-clients)
-    ;;         (:rgripper . rgripper-clients)
-    ;;         (:lgripper . lgripper-clients)
-    ;;         (:torso . torso-clients)))
-
-    (send sm :arg-keys :results 'random-int-value 'async-clients 'part-async-clients
-          'base-clients 'head-clients 'rarm-clients 'larm-clients 'rgripper-clients
-          'lgripper-clients 'torso-clients
-          )
+                    (make-hazard-check-state-machine base-go-to-fridge "base_go_to_fridge"
+                                                     '(:larm :rgripper)
+                                                     )))
+    (send sm :arg-keys
+          'async-clients 'part-async-clients 'base-clients
+          'head-clients 'rarm-clients 'larm-clients
+          'rgripper-clients 'lgripper-clients 'torso-clients)
     (send sm :start-state :start)
     (send sm :goal-state (list :success))
     (send sm :add-transition :start :goto t)
     (send sm :add-transition :goto :base :success)
-    (Send sm :add-transition :base :success :success)
-
+    (send sm :add-transition :base :success :success)
     (setq *sm* sm)
     sm))
 
@@ -374,12 +311,4 @@
 (warn "#############################################################~%")
 (warn "~%")
 (warn "~%")
-
-
-
-
-
-
-
-
 
