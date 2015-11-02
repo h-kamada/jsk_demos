@@ -39,7 +39,6 @@
     (send self :remap userdata :invert t)
     (return-from :execute ret))))
 
-
 (defun actionlib-client-state
   (name client my-controller-lst
    &key (timeout 10) (retry nil) (key #'identity) (return-success :succeeded) (return-fail :failed)
@@ -125,7 +124,6 @@
         (torso-client-lst (cdr (assoc :torso userdata)))
         )
     ;; checkの一番最初にupdateが呼ばれdeleteするので、join直後にdeleteしなくてもよい
-;    (warn "<update> userdata: ~A~%" userdata)
     (dolist (client async-client-lst)
       (send client :spin-once)
       (case (send client :get-goal-state)
@@ -159,6 +157,40 @@
  ;   (warn "<update> userdata: ~A~%" userdata)
     ))
 
+;; (defun set-part-async-client-lst (userdata my-controller-lst)
+;;   (let ((part-async-client-lst (cdr (assoc :part-async userdata))) ; nilのはずではあるが一応
+;;         hazard-assoc-lst
+;;         )
+;;     (setq hazard-assoc-lst
+;;           '((:base :rgripper :lgripper)
+;;             (:head)
+;;             (:rarm :rgripper :base)
+;;             (:larm :lgripper :base)
+;;             (:rgripper :rarm :base :torso)
+;;             (:lgripper :larm :base :torso)
+;;             (:torso :rgripper :lgripper)
+;;             ))
+;;     (ros::ros-info "mycon:~A" my-controller-lst)
+;;     (setq *aa* my-controller-lst)
+;;     (dolist (controller my-controller-lst)
+;;       (ros::ros-info "controller: ~A" controller)
+;;       (dolist (ctr (assoc controller hazard-assoc-lst))
+;;         (ros::ros-info "ctr: ~A" ctr)
+;;         (let ((client-lst (cdr (assoc ctr userdata))))
+;;           (ros::ros-info "clie-lst: ~A" client-lst)
+;;           (cond
+;;            ((null (car client-lst))
+;;             ;;no clients
+;;             )
+;;            (t
+;;             (setq part-async-client-lst (append part-async-client-lst client-lst))
+;;             )))))
+;;     (setq part-async-client-lst (remove-duplicates part-async-client-lst))
+;;     (ros::ros-info "    <check> userdata:~A" userdata)
+;;     (set-alist :part-async part-async-client-lst userdata)
+;;     (ros::ros-info "    <check> userdata:~A" userdata)
+;;     ))
+
 (defun set-part-async-client-lst (userdata my-controller-lst)
   (let ((part-async-client-lst (cdr (assoc :part-async userdata))) ; nilのはずではあるが一応
         hazard-assoc-lst
@@ -172,8 +204,7 @@
             (:lgripper :larm :base :torso)
             (:torso :rgripper :lgripper)
             ))
-    (ros::ros-info "mycon:~A" my-controller-lst)
-    (setq *aa* my-controller-lst)
+    (ros::ros-info "set mycon:~A" my-controller-lst)
     (dolist (controller my-controller-lst)
       (ros::ros-info "controller: ~A" controller)
       (dolist (ctr (assoc controller hazard-assoc-lst))
@@ -193,125 +224,76 @@
     (ros::ros-info "    <check> userdata:~A" userdata)
     ))
 
-
-(defun hoge-set-part-async-client-lst (userdata my-controller-lst)
-  (ros::ros-info "hoge start")
-  (let ((part-async-client-lst (cdr (assoc :part-async userdata))) ; nilのはずではあるが一応
-        hazard-assoc-lst
-        )
-    (setq hazard-assoc-lst
-          '((:base :rgripper :lgripper)
-            (:head)
-            (:rarm :rgripper :base)
-            (:larm :lgripper :base)
-            (:rgripper :rarm :base :torso)
-            (:lgripper :larm :base :torso)
-            (:torso :rgripper :lgripper)
-            ))
-    (ros::ros-info "hoge set mycon:~A" my-controller-lst)
-    (dolist (controller my-controller-lst)
-      (ros::ros-info "controller: ~A" controller)
-      (dolist (ctr (assoc controller hazard-assoc-lst))
-        (ros::ros-info "ctr: ~A" ctr)
-        (let ((client-lst (cdr (assoc ctr userdata))))
-          (ros::ros-info "clie-lst: ~A" client-lst)
-          (cond
-           ((null (car client-lst))
-            ;;no clients
-            )
-           (t
-            (setq part-async-client-lst (append part-async-client-lst client-lst))
-            )))))
-    (setq part-async-client-lst (remove-duplicates part-async-client-lst))
-    (ros::ros-info "    <check> userdata:~A" userdata)
-    (set-alist :part-async part-async-client-lst userdata)
-    (ros::ros-info "    <check> userdata:~A" userdata)
-    ))
-
-(defun fuga (a )
-  (print "fuga"))
-
+;; (defmacro make-check-function (user-defined-function my-controller-lst)
+;;   (ros::ros-info "check: mycon: ~A" my-controller-lst)
+;;   `(let ()
+;;      (cond
+;;        ((not (functionp ',user-defined-function))
+;;         (ros::ros-info "mycon  bbb: ~A" ,my-controller-lst)
+;;         #'(lambda (userdata)
+;;             ;; update
+;;             (update-client-lst userdata)
+;;             (ros::ros-info "    user function not defined. Check structure hazard.")
+;;             (cond
+;;               ((equal (car (cdr (assoc :async userdata))) nil)
+;;                t)
+;;               (t ;; There are some clients waiting result.
+;;                (set-part-async-client-lst userdata ,my-controller-lst)
+;;                (ros::ros-info "mycon: ~A" ,my-controller-lst)
+;; ;               (set-part-async-client-lst userdata ,my-controller-lst)
+;;                (let ((part-async-client-lst (cdr (assoc :part-async userdata))))
+;;                  (ros::ros-info "part:~A" part-async-client-lst)
+;;                  (cond
+;;                   ((null part-async-client-lst)
+;;                    t)
+;;                   (t
+;;                    nil))
+;;                  )
+;;                ))))
+;;        (t
+;;         #'(lambda (userdata)
+;;             ;; update
+;;             (update-client-lst userdata)
+;;             (ros::ros-info "    user function found. Exec user function.")
+;;             (,user-defined-function userdata)
+;;             t
+;;             )))
+;;      ))
 
 (defmacro make-check-function (user-defined-function my-controller-lst)
-  (ros::ros-info "check: mycon: ~A" my-controller-lst)
   `(let ()
+     (ros::ros-info "mycon: ~A" ',my-controller-lst)
+     (ros::ros-info "car: ~A" (car ',my-controller-lst))
+     (ros::ros-info "cdr: ~A" (cdr ',my-controller-lst))
+     (ros::ros-info "user func: ~A" ',user-defined-function)
      (cond
-       ((not (functionp ',user-defined-function))
-        (ros::ros-info "mycon  bbb: ~A" ,my-controller-lst)
-        #'(lambda (userdata)
-            ;; update
-            (update-client-lst userdata)
-            (ros::ros-info "    user function not defined. Check structure hazard.")
-            (cond
-              ((equal (car (cdr (assoc :async userdata))) nil)
-               t)
-              (t ;; There are some clients waiting result.
-               (set-part-async-client-lst userdata ,my-controller-lst)
-               (ros::ros-info "mycon: ~A" ,my-controller-lst)
-;               (set-part-async-client-lst userdata ,my-controller-lst)
-               (let ((part-async-client-lst (cdr (assoc :part-async userdata))))
-                 (ros::ros-info "part:~A" part-async-client-lst)
-                 (cond
-                  ((null part-async-client-lst)
-                   t)
-                  (t
-                   nil))
-                 )
-               ))))
-       (t
-        #'(lambda (userdata)
-            ;; update
-            (update-client-lst userdata)
-            (ros::ros-info "    user function found. Exec user function.")
-            (,user-defined-function userdata)
-            t
-            )))
+      ((not (functionp ',user-defined-function))
+       '(lambda (userdata)
+          ;; update
+          (update-client-lst userdata)
+          (ros::ros-info "    user function not defined. Check structure hazard.")
+          (cond
+           ((equal (car (cdr (assoc :async userdata))) nil)
+            t)
+           (t ;; There are some clients waiting result.
+            (set-part-async-client-lst userdata ',my-controller-lst)
+            (let ((part-async-client-lst (cdr (assoc :part-async userdata)))
+                  )
+              (cond
+               ((null part-async-client-lst)
+                t)
+               (t
+                nil))
+              )))))
+      (t
+       '(lambda (userdata)
+          ;; update
+          (update-client-lst userdata)
+          (ros::ros-info "    user function found. Exec user function.")
+          (,user-defined-function userdata)
+          t
+          )))
      ))
-
-(defmacro hoge-make-check-function (user-defined-function my-controller-lst)
-  (ros::ros-info "check: mycon: ~A" my-controller-lst)
-  `(let (func)
-     (ros::ros-info "con: ~A" ,my-controller-lst)
-     (setq *bbb* ,my-controller-lst)
-     (ros::ros-info "car: ~A" (car ,my-controller-lst))
-     (ros::ros-info "cdr: ~A" (cdr ,my-controller-lst))
-     (cond
-       ((not (functionp ',user-defined-function))
-        #'(lambda (userdata)
-            ;; update
-              (print "a")
-            (print ,my-controller-lst)
-              (print "bfd")
-            (update-client-lst userdata)
-            (ros::ros-info "    user function not defined. Check structure hazard.")
-            (cond
-             ((equal (car (cdr (assoc :async userdata))) nil)
-              t)
-             (t ;; There are some clients waiting result.
-                                        ;(ros::ros-info "mycon: ~A" my-controller-lst)
-              (let (a)
-                (print "abbbb")
-                )
-              (hoge-set-part-async-client-lst userdata ,my-controller-lst)
-              (let ((part-async-client-lst (cdr (assoc :part-async userdata)))
-                    )
-                (cond
-                 ((null part-async-client-lst)
-                  t)
-                 (t
-                  nil))
-                )
-              )))
-        )
-       (t
-        #'(lambda (userdata)
-            ;; update
-            (update-client-lst userdata)
-            (ros::ros-info "    user function found. Exec user function.")
-            (,user-defined-function userdata)
-            t
-            )))
-     )))
 
 (defun make-hazard-remap-lst (&optional my-controller-lst)
   (let ((remap-lst '((:async . async-clients)
@@ -336,163 +318,150 @@
     remap-lst
     ))
 
+;; (defmacro make-async-join-based-structure-hazard-check-state-machine
+;;   (sm-name &optional (my-controller-lst nil) (check-func nil))
+;;   "make hazard-check-state-machine"
+;;   `(let (st-check st-join st-exec ac-name ;; new-name
+;;          )
+;;      (cond
+;;       ((boundp ',sm-name)
+;;         (ros::ros-warn "state-machine(~A) is already created." ,sm-name)
+;;         ,sm-name
+;;         )
+;;        (t
+;;         (ros::ros-info "mycon:~A" ,my-controller-lst)
+;;         (setq ,sm-name (instance state-machine :init))
+;;         (setq st-check (intern (string-upcase (format nil "~A-check" ',sm-name)) *keyword-package*))
+;;         (setq st-join (intern (string-upcase (format nil "~A-join" ',sm-name)) *keyword-package*))
+;;         (setq st-exec (intern (string-upcase (format nil "~A-exec" ',sm-name)) *keyword-package*))
+;;         (setq ac-name  (string-downcase (substitute  #\_ #\- (string ',sm-name))))
+;;         (setq client (instance ros::simple-action-client :init
+;;                                ac-name roseus_smach::Sub5Action))
+;;         (setq ,sm-name (instance state-machine :init))
+;;         (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func ,my-controller-lst)))
+
+;;         (send (send ,sm-name :node st-check) :remap-list (make-hazard-remap-lst ,my-controller-lst))
+;;         (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
+;;                                            :remap-list (make-hazard-remap-lst)))
+
+;;         (send ,sm-name :add-node (actionlib-client-state st-exec client ,my-controller-lst :async t :timeout 7 :retry t :key 'convert))
+;;         (send (send ,sm-name :node st-exec) :remap-list (make-hazard-remap-lst ,my-controller-lst))
+;;         (send ,sm-name :goal-state (list :success :failure))
+;;         (send ,sm-name :add-transition st-check st-exec t)
+;;         (send ,sm-name :add-transition st-check st-join nil)
+;;         (send ,sm-name :add-transition st-join st-exec t)
+;;         (send ,sm-name :add-transition st-exec :success t)
+;;         (send ,sm-name :add-transition st-exec :failure nil)
+;;         (send ,sm-name :start-state st-check)
+;;         (send ,sm-name :arg-keys
+;;           'async-clients 'part-async-clients 'base-clients
+;;           'head-clients 'rarm-clients 'larm-clients
+;;           'rgripper-clients 'lgripper-clients 'torso-clients)
+;;         ,sm-name
+;;      ))))
+
 (defmacro make-async-join-based-structure-hazard-check-state-machine
   (sm-name &optional (my-controller-lst nil) (check-func nil))
   "make hazard-check-state-machine"
-  `(let (st-check st-join st-exec ac-name ;; new-name
-         )
+  `(let (st-check st-join st-exec ac-name)
+     (ros::ros-info "sm-name: ~A" ',sm-name)
+     (ros::ros-info "mycon aa: ~A" ',my-controller-lst)
      (cond
       ((boundp ',sm-name)
-        (ros::ros-warn "state-machine(~A) is already created." ,sm-name)
-        ,sm-name
-        )
-       (t
-        (ros::ros-info "mycon:~A" ,my-controller-lst)
-        (setq ,sm-name (instance state-machine :init))
-        (setq st-check (intern (string-upcase (format nil "~A-check" ',sm-name)) *keyword-package*))
-        (setq st-join (intern (string-upcase (format nil "~A-join" ',sm-name)) *keyword-package*))
-        (setq st-exec (intern (string-upcase (format nil "~A-exec" ',sm-name)) *keyword-package*))
-        (setq ac-name  (string-downcase (substitute  #\_ #\- (string ',sm-name))))
-        (setq client (instance ros::simple-action-client :init
-                               ac-name roseus_smach::Sub5Action))
-        (setq ,sm-name (instance state-machine :init))
-        (send ,sm-name :add-node (instance state :init st-check (make-check-function ,check-func ,my-controller-lst)))
-
-        (send (send ,sm-name :node st-check) :remap-list (make-hazard-remap-lst ,my-controller-lst))
-        (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
-                                           :remap-list (make-hazard-remap-lst)))
-
-        (send ,sm-name :add-node (actionlib-client-state st-exec client ,my-controller-lst :async t :timeout 7 :retry t :key 'convert))
-        (send (send ,sm-name :node st-exec) :remap-list (make-hazard-remap-lst ,my-controller-lst))
-        (send ,sm-name :goal-state (list :success :failure))
-        (send ,sm-name :add-transition st-check st-exec t)
-        (send ,sm-name :add-transition st-check st-join nil)
-        (send ,sm-name :add-transition st-join st-exec t)
-        (send ,sm-name :add-transition st-exec :success t)
-        (send ,sm-name :add-transition st-exec :failure nil)
-        (send ,sm-name :start-state st-check)
-        (send ,sm-name :arg-keys
-          'async-clients 'part-async-clients 'base-clients
-          'head-clients 'rarm-clients 'larm-clients
-          'rgripper-clients 'lgripper-clients 'torso-clients)
-        ,sm-name
-     ))))
-
-(defmacro hoge-make-async-join-based-structure-hazard-check-state-machine
-  (sm-name &optional (my-controller-lst nil) (check-func nil))
-  "make hazard-check-state-machine"
-  (let ((dummy-con (gensym))
-        st-check st-join st-exec ac-name
-        )
-    (ros::ros-info "sm-name: ~A" sm-name)
-    (ros::ros-info "mycon aa: ~A" my-controller-lst)
-    (setq *mycon* my-controller-lst)
-    `(cond
-      ((boundp ,sm-name)
-       (ros::ros-warn "state-machine(~A) is already created." ,sm-name)
+       (ros::ros-warn "state-machine(~A) is already created." ',sm-name)
        ,sm-name
        )
       (t
-       (ros::ros-info "sm-name: ~A" ,sm-name)
-       (ros::ros-info "mycon:~A" ,my-controller-lst)
-       (setq st-check (intern (string-upcase (format nil "~A-check" ,sm-name)) *keyword-package*))
-       (setq st-join (intern (string-upcase (format nil "~A-join" ,sm-name)) *keyword-package*))
-       (setq st-exec (intern (string-upcase (format nil "~A-exec" ,sm-name)) *keyword-package*))
+       (setq st-check (intern (string-upcase (format nil "~A-check" ',sm-name)) *keyword-package*))
+       (setq st-join (intern (string-upcase (format nil "~A-join" ',sm-name)) *keyword-package*))
+       (setq st-exec (intern (string-upcase (format nil "~A-exec" ',sm-name)) *keyword-package*))
        (ros::ros-info "check: ~A" st-check)
        ;; (setq ac-name  (string-downcase (substitute  #\_ #\- (string ',sm-name))))
-       (setq ac-name  (string-downcase (substitute  #\_ #\- (format nil "~A" ,sm-name))))
+       (setq ac-name  (string-downcase (substitute  #\_ #\- (format nil "~A" ',sm-name))))
        (ros::ros-info "ac-name: ~A" ac-name)
-       (set ,sm-name (instance state-machine :init))
+       (setq ,sm-name (instance state-machine :init))
        (setq client (instance ros::simple-action-client :init
                               ac-name roseus_smach::Sub5Action))
-       (ros::ros-info "befor mycon: ~A" ,my-controller-lst)
-;       (setq ,dummy-con ,my-controller-lst)
-       (send (eval ,sm-name) :add-node (instance state :init st-check (hoge-make-check-function ,check-func ,my-controller-lst)))
-       (ros::ros-info "hoge func : ~A"(hoge-make-check-function ,check-func ,my-controller-lst))
-       (ros::ros-info "a")
-       (send (send (eval ,sm-name) :node st-check) :remap-list (make-hazard-remap-lst ,my-controller-lst))
-       (send (eval ,sm-name) :add-node (instance async-join-state :init st-join :timeout 30
-                                          :remap-list (make-hazard-remap-lst)))
-       (ros::ros-info "v")
-       (send (eval ,sm-name) :add-node (actionlib-client-state st-exec client ,my-controller-lst :async t :timeout 7 :retry t :key 'convert))
-       (ros::ros-info "c")
-       (send (send (eval ,sm-name) :node st-exec) :remap-list (make-hazard-remap-lst ,my-controller-lst))
-       (ros::ros-info "b")
-       (send (eval ,sm-name) :goal-state (list :success :failure))
-       (send (eval ,sm-name) :add-transition st-check st-exec t)
-       (send (eval ,sm-name) :add-transition st-check st-join nil)
-       (send (eval ,sm-name) :add-transition st-join st-exec t)
-       (send (eval ,sm-name) :add-transition st-exec :success t)
-       (send (eval ,sm-name) :add-transition st-exec :failure nil)
-       (send (eval ,sm-name) :start-state st-check)
-       (send (eval ,sm-name) :arg-keys
+       (ros::ros-info "befor mycon: ~A" ',my-controller-lst)
+                                        ;       (setq ,dummy-con ,my-controller-lst)
+       (send ,sm-name :add-node
+             (instance state :init st-check
+                       (make-check-function ,check-func ,my-controller-lst)))
+       (ros::ros-info "hoge func : ~A"
+                      (make-check-function ,check-func ,my-controller-lst))
+       (send (send ,sm-name :node st-check) :remap-list (make-hazard-remap-lst ',my-controller-lst))
+       (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
+                                                 :remap-list (make-hazard-remap-lst)))
+       (send ,sm-name :add-node (actionlib-client-state st-exec client ',my-controller-lst :async t :timeout 7 :retry t :key 'convert))
+       (send (send ,sm-name :node st-exec) :remap-list (make-hazard-remap-lst ',my-controller-lst))
+       (send ,sm-name :goal-state (list :success :failure))
+       (send ,sm-name :add-transition st-check st-exec t)
+       (send ,sm-name :add-transition st-check st-join nil)
+       (send ,sm-name :add-transition st-join st-exec t)
+       (send ,sm-name :add-transition st-exec :success t)
+       (send ,sm-name :add-transition st-exec :failure nil)
+       (send ,sm-name :start-state st-check)
+       (send ,sm-name :arg-keys
              'async-clients 'part-async-clients 'base-clients
              'head-clients 'rarm-clients 'larm-clients
              'rgripper-clients 'lgripper-clients 'torso-clients)
-
-       (eval ,sm-name)
+       ,sm-name
        ))))
 
-(defun make-sm ()
-  (let ((sm (instance state-machine :init))
-        )
-    (send sm :add-node (instance state :init :start 'start))
-    (send sm :add-node
-          (instance state :init :goto
-                    (make-async-join-based-structure-hazard-check-state-machine
-                     goto-front-of-fridge
-                     '(:rarm :rgripper :larm :lgripper)
-                     )))
-    (send sm :add-node
-          (instance state :init :base
-                    (make-async-join-based-structure-hazard-check-state-machine
-                     base-go-to-fridge
-                     '(:base :rarm)
-                     )))
-    (send sm :arg-keys
-          'async-clients 'part-async-clients 'base-clients
-          'head-clients 'rarm-clients 'larm-clients
-          'rgripper-clients 'lgripper-clients 'torso-clients)
-    (send sm :start-state :start)
-    (send sm :goal-state (list :success))
-    (send sm :add-transition :start :goto :success)
-    (send sm :add-transition :goto :base :success)
-    (send sm :add-transition :base :success :success)
-    (setq *sm* sm)
-    sm))
+;; (defun make-sm ()
+;;   (let ((sm (instance state-machine :init))
+;;         )
+;;     (send sm :add-node (instance state :init :start 'start))
+;;     (send sm :add-node
+;;           (instance state :init :goto
+;;                     (make-async-join-based-structure-hazard-check-state-machine
+;;                      goto-front-of-fridge
+;;                      '(:rarm :rgripper :larm :lgripper)
+;;                      )))
+;;     (send sm :add-node
+;;           (instance state :init :base
+;;                     (make-async-join-based-structure-hazard-check-state-machine
+;;                      base-go-to-fridge
+;;                      '(:base :rarm)
+;;                      )))
+;;     (send sm :arg-keys
+;;           'async-clients 'part-async-clients 'base-clients
+;;           'head-clients 'rarm-clients 'larm-clients
+;;           'rgripper-clients 'lgripper-clients 'torso-clients)
+;;     (send sm :start-state :start)
+;;     (send sm :goal-state (list :success))
+;;     (send sm :add-transition :start :goto :success)
+;;     (send sm :add-transition :goto :base :success)
+;;     (send sm :add-transition :base :success :success)
+;;     (setq *sm* sm)
+;;     sm))
 
-(defun hoge ()
-   (make-hoge
-    '((goto-front-of-fridge (:rarm :larm))
-      (base-go-to-fridge (:base :larm))
-      ))
-   )
+;; (defun hoge ()
+;;    (make-hoge
+;;     '((goto-front-of-fridge (:rarm :larm))
+;;       (base-go-to-fridge (:base :larm))
+;;       ))
+;;    )
 
-(defun he ()
-  (smach-exec (make-hoge
-               '((goto-front-of-fridge (:rarm :larm))
-                 (base-go-to-fridge (:base :larm))
-                 ))))
+;; (defun he ()
+;;   (smach-exec (make-hoge
+;;                '((goto-front-of-fridge (:rarm :larm))
+;;                  (base-go-to-fridge (:base :larm))
+;;                  ))))
 
-(defmacro make-hoge (state-machine-information-lst)
+(defmacro make-all-state-machine (state-machine-information-lst)
   (let ((sm (instance state-machine :init))
         (prev-sm (gensym))
         (next-sm (gensym))
-        (state-machine-name (gensym))
-        (hazard-lst (gensym))
         )
     `(let (state-machine-lst)
        (send ,sm :add-node (instance state :init :start 'start))
        (dolist (sm-info ,state-machine-information-lst)
          (ros::ros-info "sm-info: ~A car: ~A cdr: ~A" sm-info (car sm-info) (cdr sm-info))
-         (setq ,state-machine-name (car sm-info))
-         (setq ,hazard-lst (cadr sm-info))
-         (ros::ros-info "name: ~A haza: ~A" ,state-machine-name ,hazard-lst)
          (send ,sm :add-node
-               (instance state :init (intern (string ,state-machine-name) *keyword-package*)
-                         (hoge-make-async-join-based-structure-hazard-check-state-machine
-                           ;; (,state-machine-name ,hazard-lst)))
-                          (car sm-info) (cadr sm-info))))
+               (instance state :init (intern (string (car sm-info)) *keyword-package*)
+                         (eval `(make-async-join-based-structure-hazard-check-state-machine
+                                 ,(car sm-info) ,(cadr sm-info)))))
          (setq state-machine-lst (append state-machine-lst (list (intern (string (car sm-info)) *keyword-package*))))
          )
        (setq *aa* ,sm)
@@ -512,16 +481,15 @@
        (setq next-sm :success)
        (send ,sm :add-transition prev-sm next-sm :success)
        ,sm
+       (smach-exec ,sm)
        )))
 
-
-
-
-
-
 (defun demo ()
-  (make-sm)
-  (smach-exec *sm*))
+  (make-all-state-machine
+    '((goto-front-of-fridge (:rarm :torso))
+      (base-go-to-fridge (:base :larm))
+      )
+    ))
 
 (warn "~%")
 (warn "~%")
