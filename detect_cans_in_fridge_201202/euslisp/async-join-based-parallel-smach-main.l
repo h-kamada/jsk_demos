@@ -2,18 +2,16 @@
 
 (ros::load-ros-manifest "roseus_smach")
 (ros::roseus "async_join_state_machine_based_fridge_demo")
+
 (require :state-machine-actionlib "package://roseus_smach/src/state-machine-actionlib.l")
 
 (defmethod async-join-state
  (:execute
   (userdata &key (step nil))
   (let (start-time ret clients part-async-client-lst)
-;    (ros::ros-info "userdata:~A" userdata)
     (send self :remap userdata :invert nil)
-;    (ros::ros-info "hogehoge userdata:~A" userdata)
     (setq start-time (ros::time-now))
     (setq part-async-client-lst (cdr (assoc :part-async userdata)))
-;    (ros::ros-info "part-async: ~A" part-async-client-lst)
     (cond
       ((null part-async-client-lst) ; normal mode
        (setq clients (cdr (assoc :async userdata)))
@@ -53,12 +51,8 @@
   (if ,async
     (progn
       (setq async-clients (cdr (assoc :async userdata)))
-;      (ros::ros-info "<exec> userdata: ~A" userdata)
       (set-alist :async (flatten (list async-clients ,client)) userdata)
-;      (ros::ros-info "<exec> userdata: ~A" userdata)
-
       ;; add client to controller-lst in userdata
-;      (ros::ros-info "<exec> my-controller-lst: ~A" (car ',my-controller-lst))
       (if (not (null ',my-controller-lst))
           (progn
             (dolist (controller ',my-controller-lst)
@@ -108,7 +102,6 @@
 
 (defun convert (val)
   (let ((goal (instance roseus_smach::Sub5ActionGoal :init)))
-   ;; (ros::ros-info "    convert to actiongoal")
     (send goal :goal :value val)
     goal))
 
@@ -123,23 +116,14 @@
         (lgripper-client-lst (cdr (assoc :lgripper userdata)))
         (torso-client-lst (cdr (assoc :torso userdata)))
         )
-    ;; (ros::ros-info "part: ~A" part-async-client-lst)
-    ;; (ros::ros-info "base: ~A" base-client-lst)
-    ;; (ros::ros-info "head: ~A" head-client-lst)
-    ;; (ros::ros-info "rarm: ~A" rarm-client-lst)
-    ;; (ros::ros-info "larm: ~A" larm-client-lst)
-    ;; (ros::ros-info "rgripper: ~A" rgripper-client-lst)
-    ;; (ros::ros-info "lgripper: ~A" lgripper-client-lst)
-    ;; (ros::ros-info "torso: ~A" torso-client-lst)
-    ;; checkの一番最初にupdateが呼ばれdeleteするので、join直後にdeleteしなくてもよい
     (dolist (client async-client-lst)
       (send client :spin-once)
-      (ros::ros-info "client: ~A   goal state: ~A" client (send client :get-goal-state))
+      (ros::ros-info "client: ~A   goal state: ~A" client (send client :get-state))
       (cond
-       ((equal (send client :get-goal-state) ros::*simple-goal-state-done*)
+       ((equal (send client :get-state) actionlib_msgs::GoalStatus::*succeeded*)
         (ros::ros-info "Delete the client(~A)." client)
-         ;; delete the client from all lists
-         (setq async-client-lst (remove client async-client-lst)
+        ;; delete the client from all lists
+        (setq async-client-lst (remove client async-client-lst)
                part-async-client-lst (remove client part-async-client-lst)
                base-client-lst (remove client base-client-lst)
                head-client-lst (remove client head-client-lst)
@@ -153,14 +137,6 @@
         ;; nothing
         )
        ))
-    ;; (ros::ros-info "part: ~A" part-async-client-lst)
-    ;; (ros::ros-info "base: ~A" base-client-lst)
-    ;; (ros::ros-info "head: ~A" head-client-lst)
-    ;; (ros::ros-info "rarm: ~A" rarm-client-lst)
-    ;; (ros::ros-info "larm: ~A" larm-client-lst)
-    ;; (ros::ros-info "rgripper: ~A" rgripper-client-lst)
-    ;; (ros::ros-info "lgripper: ~A" lgripper-client-lst)
-    ;; (ros::ros-info "torso: ~A" torso-client-lst)
     ;; set those to userdata
     (set-alist :async async-client-lst userdata)
     (set-alist :part-async part-async-client-lst userdata)
@@ -175,7 +151,7 @@
     ))
 
 (defun set-part-async-client-lst (userdata my-controller-lst)
-  (let ((part-async-client-lst (cdr (assoc :part-async userdata))) ; nilのはずではあるが一応
+  (let ((part-async-client-lst (cdr (assoc :part-async userdata)))
         hazard-assoc-lst
         )
     (setq hazard-assoc-lst
@@ -187,13 +163,9 @@
             (:lgripper :larm :base :torso)
             (:torso :rgripper :lgripper)
             ))
-    ;; (ros::ros-info "set mycon:~A" my-controller-lst)
     (dolist (controller my-controller-lst)
-      ;; (ros::ros-info "controller: ~A" controller)
       (dolist (ctr (assoc controller hazard-assoc-lst))
-        ;; (ros::ros-info "ctr: ~A" ctr)
         (let ((client-lst (cdr (assoc ctr userdata))))
-          ;; (ros::ros-info "clie-lst: ~A" client-lst)
           (cond
            ((null (car client-lst))
             ;;no clients
@@ -202,17 +174,11 @@
             (setq part-async-client-lst (append part-async-client-lst client-lst))
             )))))
     (setq part-async-client-lst (remove-duplicates part-async-client-lst))
-    ;; (ros::ros-info "    <check> userdata:~A" userdata)
     (set-alist :part-async part-async-client-lst userdata)
-    ;; (ros::ros-info "    <check> userdata:~A" userdata)
     ))
 
 (defmacro make-check-function (user-defined-function my-controller-lst)
   `(let ()
-     ;; (ros::ros-info "mycon: ~A" ',my-controller-lst)
-     ;; (ros::ros-info "car: ~A" (car ',my-controller-lst))
-     ;; (ros::ros-info "cdr: ~A" (cdr ',my-controller-lst))
-     ;; (ros::ros-info "user func: ~A" ',user-defined-function)
      (cond
       ((not (functionp ',user-defined-function))
        '(lambda (userdata)
@@ -271,32 +237,22 @@
   (sm-name &optional (my-controller-lst nil) (check-func nil))
   "make hazard-check-state-machine"
   `(let (st-check st-join st-exec ac-name)
-     ;; (ros::ros-info "sm-name: ~A" ',sm-name)
-     ;; (ros::ros-info "mycon aa: ~A" ',my-controller-lst)
      (cond
       ((boundp ',sm-name)
-       (ros::ros-warn "state-machine(~A) is already created." ',sm-name)
+       (ros::ros-warn "state-machine(~A) is already created. Use different name." ',sm-name)
        ,sm-name
        )
       (t
        (setq st-check (intern (string-upcase (format nil "~A-check" ',sm-name)) *keyword-package*))
        (setq st-join (intern (string-upcase (format nil "~A-join" ',sm-name)) *keyword-package*))
        (setq st-exec (intern (string-upcase (format nil "~A-exec" ',sm-name)) *keyword-package*))
-       ;; (ros::ros-info "check: ~A" st-check)
-       ;; (setq ac-name  (string-downcase (substitute  #\_ #\- (string ',sm-name))))
        (setq ac-name  (string-downcase (substitute  #\_ #\- (format nil "~A" ',sm-name))))
-       ;; (ros::ros-info "ac-name: ~A" ac-name)
        (setq ,sm-name (instance state-machine :init))
        (setq client (instance ros::simple-action-client :init
                               ac-name roseus_smach::Sub5Action))
-       ;; (ros::ros-info "befor mycon: ~A" ',my-controller-lst)
-       ;; (setq ,dummy-con ,my-controller-lst)
        (send ,sm-name :add-node
              (instance state :init st-check
                        (make-check-function ,check-func ,my-controller-lst)))
-       ;; (ros::ros-info "hoge func : ~A"
-       ;;                (make-check-function ,check-func ,my-controller-lst))
-       ;; (send (send ,sm-name :node st-check) :remap-list (make-hazard-remap-lst ',my-controller-lst))
        (send (send ,sm-name :node st-check) :remap-list (make-hazard-remap-lst nil t))
        (send ,sm-name :add-node (instance async-join-state :init st-join :timeout 30
                                                  :remap-list (make-hazard-remap-lst)))
@@ -316,65 +272,111 @@
        ,sm-name
        ))))
 
-(defmacro make-all-state-machine (state-machine-information-lst)
-  (let ((sm (instance state-machine :init))
-        (prev-sm (gensym))
+(defmacro make-hsm (state-machine-name state-machine-information-lst)
+  (let ((prev-sm (gensym))
         (next-sm (gensym))
         )
     `(let (state-machine-lst)
-       (send ,sm :add-node (instance state :init :start 'start))
-       (dolist (sm-info ,state-machine-information-lst)
-         ;; (ros::ros-info "sm-info: ~A car: ~A cdr: ~A" sm-info (car sm-info) (cdr sm-info))
-         (send ,sm :add-node
-               (instance state :init (intern (string (car sm-info)) *keyword-package*)
-                         (eval `(make-async-join-based-structure-hazard-check-state-machine
-                                 ,(car sm-info) ,(cadr sm-info)))))
-         (setq state-machine-lst (append state-machine-lst (list (intern (string (car sm-info)) *keyword-package*))))
-         )
-       (setq *aa* ,sm)
-       (send ,sm :arg-keys
-             'async-clients 'part-async-clients 'base-clients
-             'head-clients 'rarm-clients 'larm-clients
-             'rgripper-clients 'lgripper-clients 'torso-clients)
-       (send ,sm :start-state :start)
-       (send ,sm :goal-state (list :success))
-       ;; (ros::ros-info "sm-lst" state-machine-lst)
-       (setq prev-sm :start)
-       (dolist (st-mn state-machine-lst)
-         (setq next-sm st-mn)
-         (send ,sm :add-transition prev-sm next-sm :success)
-         (setq prev-sm st-mn)
-         )
-       (setq next-sm :success)
-       (send ,sm :add-transition prev-sm next-sm :success)
-       ,sm
-       (smach-exec ,sm)
-       )))
+       (cond
+        ((boundp ',state-machine-name)
+         (ros::ros-warn "state-machine(~A) is already created. Use different name." ',state-machine-name)
+         ,state-machine-name)
+        (t
+         (setq ,state-machine-name (instance state-machine :init))
+         (send ,state-machine-name :add-node (instance state :init :start 'start))
+         (dolist (sm-info ,state-machine-information-lst)
+           (cond
+            ((and (not (listp sm-info))
+              (derivedp (eval sm-info) state-machine))
+             (ros::ros-info "Detected state-machine(~A)." sm-info)
+             (send ,state-machine-name :add-node
+                   (instance state :init
+                             (intern (string sm-info) *keyword-package*) (eval sm-info)))
+             (setq state-machine-lst (append state-machine-lst (list (intern (string sm-info) *keyword-package*))))
+             )
+            (t
+             (send ,state-machine-name :add-node
+                   (instance state :init (intern (string (car sm-info)) *keyword-package*)
+                             (eval `(make-async-join-based-structure-hazard-check-state-machine
+                                     ,(car sm-info) ,(cadr sm-info)))))
+             (setq state-machine-lst (append state-machine-lst (list (intern (string (car sm-info)) *keyword-package*))))
+             )))
+         (send ,state-machine-name :arg-keys
+               'async-clients 'part-async-clients 'base-clients
+               'head-clients 'rarm-clients 'larm-clients
+               'rgripper-clients 'lgripper-clients 'torso-clients)
+         (send ,state-machine-name :start-state :start)
+         (send ,state-machine-name :goal-state (list :success))
+         (setq prev-sm :start)
+         (dolist (st-mn state-machine-lst)
+           (setq next-sm st-mn)
+           (send ,state-machine-name :add-transition prev-sm next-sm :success)
+           (setq prev-sm st-mn)
+           )
+         (setq next-sm :success)
+         (send ,state-machine-name :add-transition prev-sm next-sm :success)
+         ,state-machine-name
+         )))))
 
 (defun demo ()
-  (make-all-state-machine
-    '((goto-front-of-fridge (:rarm :larm :rgripper :lgripper :torso))
-      (base-go-to-fridge (:base))
-      (open-fridge-door-initial-pose (:rarm :larm :rgripper :lgripper :torso :head))
-      ;; (look-at-fridge (:head))
-      (move-to-and-open-fridge-door (:base :rarm))
-      (move-forward-larm (:larm))
-      (detach-fridge-handle (:larm :lgripper))
-      (swipe-fridge-door (:larm))
-      (move-to-can-spot (:base))
-      (grasp-can-init (:rarm :larm :rgripper :lgripper :torso))
-      (grasp-can-motion (:larm :lgripper))
-      (go-back-from-fridge (:base))
-      (close-fridge (:rarm))
-      )
-    ))
+  (make-hsm
+   fridge-demo
+   '((goto-front-of-fridge (:rarm :larm :rgripper :lgripper :torso))
+     (base-go-to-fridge (:base))
+     (open-fridge-door-initial-pose (:rarm :larm :rgripper :lgripper :torso :head))
+     (look-at-fridge (:head))
+     (move-to-and-open-fridge-door (:base :rarm))
+     (move-forward-larm (:larm))
+     (detach-fridge-handle (:larm :lgripper))
+     (swipe-fridge-door (:larm))
+     (move-to-can-spot (:base))
+     (grasp-can-init (:rarm :larm :rgripper :lgripper :torso))
+     (grasp-can-motion (:larm :lgripper))
+     (go-back-from-fridge (:base))
+     (close-fridge (:rarm))
+     ))
+  (smach-exec fridge-demo))
+
+(defun demo2()
+  (make-hsm
+   goto-fridge
+   '((goto-front-of-fridge  (:rarm :larm :rgripper :lgripper :torso))
+     (base-go-to-fridge (:base))
+     ))
+  (make-hsm
+   open-fridge-door
+   '((open-fridge-door-initial-pose (:rarm :larm :rgripper :lgripper :torso :head))
+     (look-at-fridge (:head))
+     (move-to-and-open-fridge-door (:base :rarm))
+     (move-forward-larm (:larm))
+     (detach-fridge-handle (:larm :lgripper))
+     (swipe-fridge-door (:larm))
+     ))
+  (make-hsm
+   grasp-can
+   '((move-to-can-spot (:base))
+     (grasp-can-init (:rarm :larm :rgripper :lgripper :torso))
+     (grasp-can-motion (:larm :lgripper))
+     ))
+  (make-hsm
+   close
+   '((go-back-from-fridge (:base))
+     (close-fridge (:rarm))
+     ))
+  (make-hsm
+   fridge-demo
+   '(goto-fridge
+     open-fridge-door
+     grasp-can
+     close
+     ))
+  )
 
 (warn "~%")
 (warn "~%")
 (warn "Caution######################################################~%")
 (warn "async-join-state class differs from original one.~%")
 (warn "actionlib-client-state function differs from original one.~%")
-(warn "ros::simple-action-client differs from original one. <--- changed raw data ~%")
 (warn "#############################################################~%")
 (warn "~%")
 (warn "~%")
