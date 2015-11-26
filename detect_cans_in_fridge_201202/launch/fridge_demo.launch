@@ -1,8 +1,8 @@
 <launch>
   <arg name="main" default="false" />
-  <arg name="dry" default="false" />
-  <param name="dryrun" value="true" if="$(arg dry)"/>
-  <param name="dryrun" value="false" unless="$(arg dry)"/>
+  <arg name="DRY" default="false" />
+  <param name="dryrun" value="true" if="$(arg DRY)"/>
+  <param name="dryrun" value="false" unless="$(arg DRY)"/>
 
   <node pkg="roseus" type="roseus" name="fridge_demo_main" output="screen" if="$(arg main)"
         args="$(find detect_cans_in_fridge_201202)/euslisp/async-join-based-parallel-smach-main.l" />

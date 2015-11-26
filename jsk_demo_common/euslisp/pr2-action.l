@@ -362,18 +362,18 @@
     (when fix-waist-z
       (unless (numberp fix-waist-z) (setq fix-waist-z 130))
       (send *pr2* :torso :waist-z :joint-angle fix-waist-z))
-    (cond
-     ((move-arm hand st0
-                :use-torso (if use-torso (/ use-torso 5))
-                :rotation-axis t :sec start-sec :move-robot move-robot)
-      t)
-     (t
-      (ros::ros-warn "Could not solve ik, return from execute-open")
-      (return-from move-fridge-traj nil)))
+    ;; (cond
+    ;;  ((move-arm hand st0
+    ;;             :use-torso (if use-torso (/ use-torso 5))
+    ;;             :rotation-axis t :sec start-sec :move-robot move-robot)
+    ;;   t)
+    ;;  (t
+    ;;   (ros::ros-warn "Could not solve ik, return from execute-open")
+    ;;   (return-from move-fridge-traj nil)))
 
-    (move-arm hand st1
-              :use-torso (if use-torso (/ use-torso 5))
-              :rotation-axis t :sec start-sec :move-robot move-robot)
+    ;; (move-arm hand st1
+    ;;           :use-torso (if use-torso (/ use-torso 5))
+    ;;           :rotation-axis t :sec start-sec :move-robot move-robot)
 
     (let ((grasp-ret (if move-robot (send *ri* :start-grasp hand :gain 0.1 :objects nil) 10)))
       (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
@@ -603,7 +603,7 @@
   )
 
 (defparameter *fridge-handle-cds* nil)
-(defun move-to-and-open-fridge-door (&key (door-type :circle) (ratio 1) (look-around nil) (head-pitch 14) (torso-lift 130) (move t) (open-fridge-func #'open-fridge-traj) (wait t))
+(defun approach-fridge-door (&key (door-type :circle) (ratio 1) (look-around nil) (head-pitch 14) (torso-lift 130) (move t) (open-fridge-func #'open-fridge-traj) (wait t))
   (let (ret
         (idealcds
          (case door-type
@@ -694,21 +694,48 @@
           (setq *last-fridge-handle* cds)
           ;; pr2 local coords transform to worldcoords
           (send cds :transform (send *pr2* :worldcoords) :world)
+          ;; keep head, torso and gripper, but start from reset-pose
+          (let ((prev-av (send *pr2* :angle-vector))
+                (hand-av))
+            (send *pr2* :reset-pose)
+            (setq hand-av (send *pr2* :rarm :angle-vector))
+            (send *pr2* :angle-vector prev-av)
+            (send *pr2* :rarm :angle-vector hand-av))
           (case door-type
             (:circle
-             (setq ret (funcall open-fridge-func
-                                :rarm cds 1.7 ;;(/ pi 2)
-                                :rotation-axis t :radius 490
-                                :wait-time 5.8 ;; t
-                                )))
+             (cond
+              ((move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector -100 0 0) :local)
+                       :use-torso nil
+                       :rotation-axis t :sec 1000 :move-robot t)
+               t)
+              (t
+               (ros::ros-warn "Could not solve ik, return from approach-fridge-door")
+               (return-from approach-fridge-door nil)))
+             (setq ret t)
+             ;; (setq ret (funcall open-fridge-func
+             ;;                    :rarm cds 1.7 ;;(/ pi 2)
+             ;;                    :rotation-axis t :radius 490
+             ;;                    :wait-time 5.8 ;; t
+             ;;                    )))
+             )
             ((:slide1 :slide2)
-             (setq ret (funcall open-fridge-func
-                                :rarm cds 320 ;; 330 ;; max
-                                :rotation-axis t :door-type :slide
-                                :wait-time t
-                                )))
+             (cond
+              ((move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector -100 0 0) :local)
+                       :use-torso nil
+                       :rotation-axis t :sec 1000 :move-robot t)
+               t)
+              (t
+               (ros::ros-warn "Could not solve ik, return from approach-fridge-door")
+               (return-from approach-fridge-door nil)))
+             (setq ret t)
+             ;; (setq ret (funcall open-fridge-func
+             ;;                    :rarm cds 320 ;; 330 ;; max
+             ;;                    :rotation-axis t :door-type :slide
+             ;;                    :wait-time t
+             ;;                    )))
+             )
             )
-          (if ret (return-from move-to-and-open-fridge-door ret)))
+          (if ret (return-from approach-fridge-door cds)))
         (if (and (boundp '*use-voicetext*) *use-voicetext*)
             (cond
              ((and (boundp '*use-english*) *use-english*)
@@ -738,11 +765,75 @@
                     (/ (elt (send diffcds :worldpos) 0) 1100.0)
                     (/ (elt (send diffcds :worldpos) 1) 1100.0)
                     (* 0.9 (rad2deg (elt (car (rpy-angle (send diffcds :worldrot))) 0))))
-             )))
+              )))
         ))
       ) ;; /when cds
     ret
     ))
+
+(defun grasp-fridge-door (&optional (cds nil) &key (door-type :circle) (move-robot t))
+  (cond
+   (cds
+    t)
+   (t
+    (cond
+     ((not (send *ri* :simulation-modep)) ;; real mode
+      (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
+                                 :detection-topic "/kinect_head/rgb/ObjectDetection"
+                                 )))
+     (t ;; simulation mode
+      (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))
+      ))))
+
+  (setq cds
+        (make-coords :pos (send cds :worldpos)
+                     :rpy (list (caar (send cds :rpy-angle)) 0 0)))
+  (case door-type
+    (:slide1
+     (send cds :translate (float-vector 0 -230 -355)))
+    (:slide2
+     (send cds :translate (float-vector 0 -230 -675))))
+  (send cds :transform (send *pr2* :worldcoords) :world)
+  (cond
+   ((move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector 25 0 0) :local)
+              :use-torso nil
+              :rotation-axis t :sec 1000 :move-robot t) ;; 1000必要か
+    t)
+   (t
+    (ros::ros-warn "Could not solve ik, return from approach-fridge-door")
+    (return-from grasp-fridge-door nil)))
+  (let ((grasp-ret (if move-robot (send *ri* :start-grasp :rarm :gain 0.1 :objects nil) 10)))
+    (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
+               (and grasp-check
+                    (< grasp-ret 8))) ;; grasp
+      (ros::ros-warn "Grasp handle failed, return from grasp-fridge-door")
+      (return-from grasp-fridge-door nil))
+    (return-from grasp-fridge-door t)))
+
+(defun solve-ik-and-open-fridge-door (&optional (cds nil) &key (door-type :circle))
+  (cond
+   (cds
+    t)
+   (t
+    (cond
+     ((not (send *ri* :simulation-modep)) ;; real mode
+      (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
+                                 :detection-topic "/kinect_head/rgb/ObjectDetection"
+                                 )))
+     (t ;; simulation mode
+      (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))
+      ))))
+  (setq cds
+        (make-coords :pos (send cds :worldpos)
+                     :rpy (list (caar (send cds :rpy-angle)) 0 0)))
+  (case door-type
+    (:slide1
+     (send cds :translate (float-vector 0 -230 -355)))
+    (:slide2
+     (send cds :translate (float-vector 0 -230 -675))))
+  (send cds :transform (send *pr2* :worldcoords) :world)
+  (open-fridge-traj :rarm cds 1.7 :rotation-axix t :radius 490 :wait-time 0)
+  )
 
 (defun move-forward-larm (&key (ratio 1) (wait t))
   (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
@@ -775,7 +866,7 @@
             (float-vector 130 38.3106 20.1389 77.7708 -88.0224 -47.5755 -5.72958 -10.483 -12.7603 46.1883 -29.4706 -70.2965 245.815 -44.8729 150.788 0.003956 -13.794)
             )
            (list 1200 600 1000 700))
-     (send *ri* :stop-grasp :rarm)
+     ;; (send *ri* :stop-grasp :rarm)
      (send *ri* :wait-interpolation)
      )
     ((:slide1 :slide2)
@@ -849,11 +940,11 @@
     ;; detect fridge and open door
     (dotimes (i 10 nil)
       ;; detect fridge and move to the fridge door
-      (setq ret (move-to-and-open-fridge-door :door-type door-type :ratio ratio :look-around look-around :head-pitch head-pitch :torso-lift torso-lift :move move :open-fridge-func open-fridge-func :wait wait))
-      (if ret (return))
+      (setq cds (approach-fridge-door :door-type door-type :ratio ratio :look-around look-around :head-pitch head-pitch :torso-lift torso-lift :move move :open-fridge-func open-fridge-func :wait wait))
+      (if cds (return))
       )
 
-    (when (not ret)
+    (when (not cds)
       (ros::ros-info "TIMEOUT: open-fridge-door");;
       (if (and (boundp '*use-voicetext*) *use-voicetext*)
           (cond
@@ -863,6 +954,9 @@
         (speak-jp "れいぞうこ を みつけられません でした"))
       (send *ri* :ros-wait 2.0 :spin-self t :spin t) ;; attention-check ...
       (return-from open-fridge-door nil))
+
+    (grasp-fridge-door cds)
+    (solve-ik-and-open-fridge-door cds)
 
     ;;move larm forward to keep the fridge door open
     (move-forward-larm :ratio ratio :wait wait)

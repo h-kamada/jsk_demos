@@ -364,16 +364,16 @@
 (defun demo (&optional (stages nil))
   (make-hsm
    fridge-demo
-   '((base-go-to-fridge-init-pose (:rarm :larm :rgripper :lgripper :torso))
-     (base-go-to-fridge (:base))
-     (open-fridge-door-initial-pose (:rarm :larm :rgripper :lgripper :torso :head))
-     (move-to-and-open-fridge-door (:base :rarm :rgripper))
-     (move-forward-larm (:larm))
-     (detach-fridge-handle (:larm :lgripper))
-     (swipe-fridge-door (:larm))
+   '((base-go-to-fridge-init-pose (:head :torso))
+;     (base-go-to-fridge (:base))
+     (open-fridge-door-initial-pose (:rarm :larm :head :torso))
+     (move-to-and-open-fridge-door (:base :head :torso :rarm :rgripper))
+     (move-forward-larm (:rarm :larm)) ;; とりあえずrarm入れた 本当は無いはず
+     (detach-fridge-handle (:rgripper))
+     (swipe-fridge-door (:larm :rarm))
      (grasp-can-posing (:rarm :larm :head))
      (move-to-can-spot (:base))
-     (grasp-can-init (:rarm :larm :rgripper :lgripper :torso))
+     (grasp-can-init (:head))
      (grasp-can-motion (:larm :lgripper))
      (go-back-from-fridge (:base))
      (close-fridge (:rarm))
@@ -389,22 +389,22 @@
 (defun demo2 (&optional (stages nil))
   (make-hsm
    goto-fridge
-   '((base-go-to-fridge-init-pose  (:rarm :larm :rgripper :lgripper :torso))
+   '((base-go-to-fridge-init-pose  (:head :torso))
      (base-go-to-fridge (:base))
      ))
   (make-hsm
    open-fridge-door
-   '((open-fridge-door-initial-pose (:rarm :larm :rgripper :lgripper :torso :head))
-     (move-to-and-open-fridge-door (:base :rarm :rgripper))
+   '((open-fridge-door-initial-pose (:head :torso))
+     (move-to-and-open-fridge-door (:base :head :torso :rarm :rgripper))
      (move-forward-larm (:larm))
-     (detach-fridge-handle (:larm :lgripper))
-     (swipe-fridge-door (:larm))
+     (detach-fridge-handle (:rgripper))
+     (swipe-fridge-door (:larm :rarm))
      (grasp-can-posing (:rarm :larm :head))
      ))
   (make-hsm
    grasp-can
    '((move-to-can-spot (:base))
-     (grasp-can-init (:rarm :larm :rgripper :lgripper :torso))
+     (grasp-can-init (:head))
      (grasp-can-motion (:larm :lgripper))
      ))
   (make-hsm
