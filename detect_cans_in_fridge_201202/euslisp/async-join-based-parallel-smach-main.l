@@ -46,6 +46,7 @@
             ;; main loop
             `(lambda (userdata)
                (let ((start (ros::time-now)) async-clients)
+                 (warning-message 5 "execute ~A~%" ,client)
                  (send ,client :send-goal
                        (funcall (quote ,key) (cdr (assoc :goal userdata))))
                  (if ,async
@@ -190,13 +191,21 @@
         hazard-assoc-lst
         )
     (setq hazard-assoc-lst
-          '((:base :rgripper :lgripper)
+          '(
+            ;; (:base :rgripper :lgripper)
+            ;; (:head)
+            ;; (:rarm :rgripper :base)
+            ;; (:larm :lgripper :base)
+            ;; (:rgripper :rarm :base :torso)
+            ;; (:lgripper :larm :base :torso)
+            ;; (:torso :rgripper :lgripper)
+            (:base)
             (:head)
-            (:rarm :rgripper :base)
-            (:larm :lgripper :base)
-            (:rgripper :rarm :base :torso)
-            (:lgripper :larm :base :torso)
-            (:torso :rgripper :lgripper)
+            (:rarm)
+            (:larm)
+            (:rgripper)
+            (:lgripper)
+            (:torso)
             ))
     (dolist (controller my-controller-lst)
       (dolist (ctr (assoc controller hazard-assoc-lst))
@@ -364,18 +373,18 @@
 (defun demo (&optional (stages nil))
   (make-hsm
    fridge-demo
-   '((base-go-to-fridge-init-pose (:rarm :larm :rgripper :lgripper :torso))
-     (base-go-to-fridge (:base))
-     (open-fridge-door-initial-pose (:rarm :larm :rgripper :lgripper :torso :head))
-     (move-to-and-open-fridge-door (:base :rarm :rgripper))
-     (move-forward-larm (:larm))
-     (detach-fridge-handle (:larm :lgripper))
-     (swipe-fridge-door (:larm))
+   '((base-go-to-fridge-init-pose (:head :torso))
+;     (base-go-to-fridge (:base))
+     (open-fridge-door-initial-pose (:torso :head))
+     (move-to-and-open-fridge-door (:base :rarm :rgripper :torso))
+     (move-forward-larm (:larm :rarm)) ;; rarm add
+     (detach-fridge-handle (:rgripper))
+     (swipe-fridge-door (:larm :rarm))
      (grasp-can-posing (:rarm :larm :head))
      (move-to-can-spot (:base))
-     (grasp-can-init (:rarm :larm :rgripper :lgripper :torso))
+     (grasp-can-init (:head))
      (grasp-can-motion (:larm :lgripper))
-     (go-back-from-fridge (:base))
+     (go-back-from-fridge (:base :larm)) ;; larm add
      (close-fridge (:rarm))
      ))
   (cond
@@ -385,6 +394,17 @@
    (t
     (smach-exec fridge-demo)
     )))
+
+(defun hoge ()
+  (make-hsm
+   fridge-demo
+   '((hoge (:head))
+     (fuga (:torso))
+     (foo (:head))
+     (bar (:larm))))
+  (smach-exec fridge-demo)
+  )
+
 
 (defun demo2 (&optional (stages nil))
   (make-hsm

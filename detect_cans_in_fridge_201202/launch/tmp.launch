@@ -1,0 +1,18 @@
+<launch>
+  <arg name="main" default="false" />
+  <arg name="dry" default="false" />
+  <param name="dryrun" value="true" if="$(arg dry)"/>
+  <param name="dryrun" value="false" unless="$(arg dry)"/>
+
+  <node pkg="roseus" type="roseus" name="hoge" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/hoge.l" />
+
+  <node pkg="roseus" type="roseus" name="fuga" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/fuga.l" />
+
+  <node pkg="roseus" type="roseus" name="foo" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/foo.l" />
+
+  <node pkg="roseus" type="roseus" name="bar" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/bar.l" />
+</launch>

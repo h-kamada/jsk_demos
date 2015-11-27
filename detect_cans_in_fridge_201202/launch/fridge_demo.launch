@@ -7,6 +7,18 @@
   <node pkg="roseus" type="roseus" name="fridge_demo_main" output="screen" if="$(arg main)"
         args="$(find detect_cans_in_fridge_201202)/euslisp/async-join-based-parallel-smach-main.l" />
 
+  <node pkg="roseus" type="roseus" name="hoge" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/hoge.l" />
+
+  <node pkg="roseus" type="roseus" name="fuga" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/fuga.l" />
+
+  <node pkg="roseus" type="roseus" name="foo" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/foo.l" />
+
+  <node pkg="roseus" type="roseus" name="bar" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/bar.l" />
+
   <node pkg="roseus" type="roseus" name="goto_front_of_fridge" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/base-go-to-fridge-init-pose.l"  />
 
