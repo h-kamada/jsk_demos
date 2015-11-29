@@ -46,6 +46,7 @@
             ;; main loop
             `(lambda (userdata)
                (let ((start (ros::time-now)) async-clients)
+                 (warning-message 5 "execute ~A~%" ,client)
                  (send ,client :send-goal
                        (funcall (quote ,key) (cdr (assoc :goal userdata))))
                  (if ,async
@@ -190,13 +191,22 @@
         hazard-assoc-lst
         )
     (setq hazard-assoc-lst
-          '((:base :rgripper :lgripper)
+          '(
+            ;; (:base :rgripper :lgripper)
+            ;; (:head)
+            ;; (:rarm :rgripper :base)
+            ;; (:larm :lgripper :base)
+            ;; (:rgripper :rarm :base :torso)
+            ;; (:lgripper :larm :base :torso)
+            ;; (:torso :rgripper :lgripper)
+
+            (:base)
             (:head)
-            (:rarm :rgripper :base)
-            (:larm :lgripper :base)
-            (:rgripper :rarm :base :torso)
-            (:lgripper :larm :base :torso)
-            (:torso :rgripper :lgripper)
+            (:rarm)
+            (:larm)
+            (:rgripper)
+            (:lgripper)
+            (:torso)
             ))
     (dolist (controller my-controller-lst)
       (dolist (ctr (assoc controller hazard-assoc-lst))
@@ -364,18 +374,21 @@
 (defun demo (&optional (stages nil))
   (make-hsm
    fridge-demo
-   '((base-go-to-fridge-init-pose (:head :torso))
+   '(
+     (base-go-to-fridge-init-pose (:head :torso))
 ;     (base-go-to-fridge (:base))
      (open-fridge-door-initial-pose (:rarm :larm :head :torso))
-     (move-to-and-open-fridge-door (:base :head :torso :rarm :rgripper))
-     (move-forward-larm (:rarm :larm)) ;; とりあえずrarm入れた 本当は無いはず
+     (approach-fridge-door (:base :rarm :rgripper))
+     (grasp-fridge-door (:rgripper))
+     (solve-ik-and-open-fridge-door (:rarm :rgripper))
+     (move-forward-larm (:rarm :larm)) ;; rarm add
      (detach-fridge-handle (:rgripper))
      (swipe-fridge-door (:larm :rarm))
      (grasp-can-posing (:rarm :larm :head))
      (move-to-can-spot (:base))
      (grasp-can-init (:head))
      (grasp-can-motion (:larm :lgripper))
-     (go-back-from-fridge (:base))
+     (go-back-from-fridge (:base :lgripper)) ;; lgripper add
      (close-fridge (:rarm))
      ))
   (cond

@@ -771,7 +771,7 @@
     ret
     ))
 
-(defun grasp-fridge-door (&optional (cds nil) &key (door-type :circle) (move-robot t))
+(defun grasp-fridge-door (&optional (cds nil) &key (door-type :circle) (move-robot t) (grasp-check t))
   (cond
    (cds
     t)
@@ -794,6 +794,9 @@
     (:slide2
      (send cds :translate (float-vector 0 -230 -675))))
   (send cds :transform (send *pr2* :worldcoords) :world)
+  (let ((prev-av
+         (float-vector 130.072 22.9146 57.2941 -0.001244 -117.452 0.00187 -5.72958 -360.0 -2.05726 -16.4737 -77.9557 -76.7 -162.904 -77.8544 254.584 23.0407 18.474)))
+    (send *pr2* :angle-vector prev-av))
   (cond
    ((move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector 25 0 0) :local)
               :use-torso nil
@@ -832,7 +835,10 @@
     (:slide2
      (send cds :translate (float-vector 0 -230 -675))))
   (send cds :transform (send *pr2* :worldcoords) :world)
-  (open-fridge-traj :rarm cds 1.7 :rotation-axix t :radius 490 :wait-time 0)
+  (let ((prev-av
+         (float-vector 130.072 22.9146 57.2941 -0.001244 -117.452 0.00187 -5.72958 -360.0 3.53847 -14.7482 -76.7797 -53.201 -164.906 -61.8327 248.035 23.0347 18.336)))
+    (send *pr2* :angle-vector prev-av))
+  (open-fridge-traj :rarm cds 1.7 :rotation-axis t :radius 490 :wait-time t)
   )
 
 (defun move-forward-larm (&key (ratio 1) (wait t))
