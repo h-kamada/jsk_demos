@@ -373,19 +373,20 @@
 (defun demo (&optional (stages nil))
   (make-hsm
    fridge-demo
-   '((base-go-to-fridge-init-pose (:head :torso))
-;     (base-go-to-fridge (:base))
-     (open-fridge-door-initial-pose (:torso :head))
-     (move-to-and-open-fridge-door (:base :rarm :rgripper :torso))
-     (move-forward-larm (:larm :rarm)) ;; rarm add
-     (detach-fridge-handle (:rgripper))
-     (swipe-fridge-door (:larm :rarm))
+   '(
+     ;(base-go-to-fridge-init-pose (:head :torso))
+     (base-go-to-fridge (:base))
+     ;; (open-fridge-door-initial-pose (:torso :head))
+     ;; (move-to-and-open-fridge-door (:base :rarm :rgripper :torso))
+     ;; (move-forward-larm (:larm :rarm)) ;; rarm add
+     ;; (detach-fridge-handle (:rgripper))
+     ;; (swipe-fridge-door (:larm :rarm))
      (grasp-can-posing (:rarm :larm :head))
      (move-to-can-spot (:base))
-     (grasp-can-init (:head))
-     (grasp-can-motion (:larm :lgripper))
-     (go-back-from-fridge (:base :larm)) ;; larm add
-     (close-fridge (:rarm))
+     ;; (grasp-can-init (:head))
+     ;; (grasp-can-motion (:larm :lgripper))
+     ;; (go-back-from-fridge (:base :larm)) ;; larm add
+     ;; (close-fridge (:rarm))
      ))
   (cond
    (stages
