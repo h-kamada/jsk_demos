@@ -12,7 +12,7 @@
       (require :jsk-smart-gui-utils "package://jsk_smart_gui/src/utils.l"))
     (warning-message 1 ";; Could not found jsk_smarg_gui....~%"))
 
-(defvar *use-voicetext* t)
+(defvar *use-voicetext* nil)
 (defvar *use-english* nil)
 
 (if (and (boundp '*use-voicetext*) *use-voicetext*)
@@ -583,6 +583,8 @@
 
 (defun open-fridge-door-initial-pose (&key (wait t) (door-type :circle) (head-pitch 14) (torso-lift 130) (ratio 1))
 
+  (ros::advertise "detectflag" std_msgs::Bool 1)
+  (ros::publish "detectflag" t)
   (case door-type
     (:circle
      (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
@@ -623,7 +625,7 @@
     ;; finding handle position
     (cond
      ((not (send *ri* :simulation-modep)) ;; real mode
-      (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
+      (setq cds (check-detection-srv :type "fridge" :speak-name *frige-speak-str*
                                  :detection-topic "/kinect_head/rgb/ObjectDetection"
                                  )))
      (t ;; simulation mode
@@ -659,7 +661,7 @@
                     *fridge-rotation-threshold*)))
         (cond
          ((not (send *ri* :simulation-modep)) ;; real mode
-          (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
+          (setq cds (check-detection-srv :type "fridge" :speak-name *frige-speak-str*
                                      :detection-topic "/kinect_head/rgb/ObjectDetection"))
           )
          (t ;; simulation mode
@@ -778,9 +780,9 @@
    (t
     (cond
      ((not (send *ri* :simulation-modep)) ;; real mode
-      (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
-                                 :detection-topic "/kinect_head/rgb/ObjectDetection"
-                                 )))
+      (setq cds (check-detection-srv :type "fridge" :speak-name *frige-speak-str*
+                                     :detection-topic "/kinect_head/rgb/ObjectDetection"
+                                     )))
      (t ;; simulation mode
       (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))
       ))))
@@ -820,9 +822,9 @@
    (t
     (cond
      ((not (send *ri* :simulation-modep)) ;; real mode
-      (setq cds (check-detection :type "fridge" :speak-name *frige-speak-str*
-                                 :detection-topic "/kinect_head/rgb/ObjectDetection"
-                                 )))
+      (setq cds (check-detection-srv :type "fridge" :speak-name *frige-speak-str*
+                                     :detection-topic "/kinect_head/rgb/ObjectDetection"
+                                     )))
      (t ;; simulation mode
       (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))
       ))))
@@ -1002,6 +1004,7 @@
 
 
 (defun grasp-can-init ()
+  (ros::publish "detectflag" nil)
   (send *pr2* :head :neck-p :joint-angle 20)
   (send *pr2* :head :neck-y :joint-angle 23)
   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000 :head-controller)
