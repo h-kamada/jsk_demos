@@ -583,8 +583,11 @@
 
 (defun open-fridge-door-initial-pose (&key (wait t) (door-type :circle) (head-pitch 14) (torso-lift 130) (ratio 1))
 
-  (ros::advertise "detectflag" std_msgs::Bool 1)
-  (ros::publish "detectflag" t)
+  (let (msg)
+    (ros::advertise "detectflag" std_msgs::Bool 1)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data t)
+    (ros::publish "detectflag" msg))
   (case door-type
     (:circle
      (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
@@ -1004,7 +1007,11 @@
 
 
 (defun grasp-can-init ()
-  (ros::publish "detectflag" nil)
+  (let (msg)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data nil)
+    (ros::publish "detectflag" msg)
+    )
   (send *pr2* :head :neck-p :joint-angle 20)
   (send *pr2* :head :neck-y :joint-angle 23)
   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000 :head-controller)
@@ -1015,6 +1022,7 @@
   ;; detect cans which was indicated by ( type )
   ;;(when (not (setq cds (check-detection :type *type* :single t)))
   ;;(setq cds (check-detection :type *type* :tf-force t :timeout 30 :single t)))
+  (send *ri* :stop-grasp use-arm)
   (let (cds isgrasp)
     (cond
      ((not (send *ri* :simulation-modep)) ;; real mode
