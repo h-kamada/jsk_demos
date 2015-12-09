@@ -404,7 +404,7 @@
       (return-from move-fridge-traj (list (reverse avs) tms)))
 
     (when move-robot
-      (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
+      ;; (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
       (send *ri* :angle-vector-sequence (reverse avs) tms))
     ;; finalize
     (cond
@@ -420,7 +420,7 @@
     ;; (send *ri* :stop-grasp hand)
     ;; (send *ri* :wait-interpolation)
     ;; ;;
-    (send *ri* :ros-wait 0.0 :spin t :spin-self t) ;; attention-check ...
+    ;; (send *ri* :ros-wait 0.0 :spin t :spin-self t) ;; attention-check ...
     (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
     (let ((end-pt (send *pr2* hand :end-coords :worldpos))
           idx)
@@ -630,9 +630,9 @@
      (t ;; simulation mode
       (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))
       ))
-    (setq *fridge-handle-cds* cds)
-    ;; need detection fail check
-    (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
+    ;; (setq *fridge-handle-cds* cds)
+    ;; ;; need detection fail check
+    ;; (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
     (when cds
       (send *obj* :reset-coords)
       (send *obj* :transform cds)
@@ -665,7 +665,7 @@
           )
          (t ;; simulation mode
           (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))))
-        (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
+        ;; (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
         ;; (y-or-n-p "Can I start open fridge? ")
         (when cds
           (if look-around (pr2-look-around))
@@ -758,7 +758,7 @@
                     (/ (elt (send diffcds :worldpos) 1) 1100.0)
                     (* 0.9 (rad2deg (elt (car (rpy-angle (send diffcds :worldrot))) 0))))
               ;; wait ???
-              (send *ri* :ros-wait 0.5 :spin-self t :spin t) ;; attention-check ...
+              ;; (send *ri* :ros-wait 0.5 :spin-self t :spin t) ;; attention-check ...
               ;; (send *ri* :wait-interpolation)
               )
              (t
@@ -855,7 +855,7 @@
   (if wait
       (progn
         (send *ri* :wait-interpolation)
-        (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
+        ;; (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
         (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
         ))
   )
@@ -1117,9 +1117,9 @@
     (setq av (send *pr2* use-arm :inverse-kinematics default-cds :rotation-axis t))
     (cond
      ((eq use-arm :rarm)
-      (send *ri* :angle-vector av 4000 :rarm-controller))
+      (send *ri* :angle-vector av 3000 :rarm-controller))
      (t
-      (send *ri* :angle-vector av 4000 :larm-controller)))))
+      (send *ri* :angle-vector av 3000 :larm-controller)))))
 
 (defparameter *can-cds* nil)
 (defun grasp-can-motion (&key (use-arm :rarm) (rotation 20))
@@ -1207,28 +1207,31 @@
   (approach-can :use-arm :larm)
   (catch-can :use-arm :larm)
   (put-arm-to-the-outside :use-arm :larm)
+  (go-back-from-fridge :isgrasp isgrasp :move move :use-arm use-arm :rotation rotation)
 
-  (when (not move-only)
-    (let (isgrasp res)
-      ;; grasp can
-      (unix:sleep 2)
-      (dotimes (trial 10)
-        (setq isgrasp (grasp-can-motion :use-arm use-arm :rotation rotation))
-        (if isgrasp (return))
-        )
-      (setq res (go-back-from-fridge :isgrasp isgrasp :move move :use-arm use-arm :rotation rotation))
-      (when res (return-from grasp-can t))
-      )
-    )
-  (when (and move post-move)
-    (if (eq use-arm :larm) (setq rotation (- rotation)))
-    (case use-arm
-      (:rarm
-       (send *ri* :go-pos-unsafe -0.3 0.05 (- rotation)))
-      (:larm
-       (send *ri* :go-pos-unsafe -0.3 -0.2 (- rotation)))))
-  (send *ri* :ros-wait 1.0 :spin-self t :spin t) ;; attention-check ...
-  nil)
+
+  ;; (when (not move-only)
+  ;;   (let (isgrasp res)
+  ;;     ;; grasp can
+  ;;     (unix:sleep 2)
+  ;;     (dotimes (trial 10)
+  ;;       (setq isgrasp (grasp-can-motion :use-arm use-arm :rotation rotation))
+  ;;       (if isgrasp (return))
+  ;;       )
+  ;;     (setq res (go-back-from-fridge :isgrasp isgrasp :move move :use-arm use-arm :rotation rotation))
+  ;;     (when res (return-from grasp-can t))
+  ;;     )
+  ;;   )
+  ;; (when (and move post-move)
+  ;;   (if (eq use-arm :larm) (setq rotation (- rotation)))
+  ;;   (case use-arm
+  ;;     (:rarm
+  ;;      (send *ri* :go-pos-unsafe -0.3 0.05 (- rotation)))
+  ;;     (:larm
+  ;;      (send *ri* :go-pos-unsafe -0.3 -0.2 (- rotation)))))
+  ;; (send *ri* :ros-wait 1.0 :spin-self t :spin t) ;; attention-check ...
+  ;; nil)
+  )
 
 (warn ";; define close-fridge")
 (defun close-fridge (&key (use-arm :rarm) (wait t))
