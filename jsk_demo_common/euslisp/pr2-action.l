@@ -896,7 +896,7 @@
     ) ;; / (case door-type
   )
 
-(defun grasp-can-posing (&key (door-type :circle) (ratio 1) (use-arm :rarm) (wait t))
+(defun grasp-can-init (&key (door-type :circle) (ratio 1) (use-arm :larm) (wait t))
   (case door-type
         (:circle
          (case use-arm
@@ -911,7 +911,10 @@
                 )
                (:larm
                 ;; grasp larm
-                (send *ri* :angle-vector (float-vector 130 -32.3186 26.4366 -19.6876 -118.217 -138.147 -78.3509 -166.767 -5.30455 69.0 -105.231 -88.5188 69.9972 -5.72958 -19.9717 20.0 24.0) (* ratio 2000))
+                (send *ri* :angle-vector
+                      (float-vector 130.019 8.70678 19.5025 30.3731 -102.48 181.816 -83.3373 151.443 -27.9934 73.7083 -126.292 -81.4446 -27.2195 -5.72958 177.248 -7.6673 14.388)
+                      (* ratio 2000))
+                ;; (send *ri* :angle-vector (float-vector 130 -32.3186 26.4366 -19.6876 -118.217 -138.147 -78.3509 -166.767 -5.30455 69.0 -105.231 -88.5188 69.9972 -5.72958 -19.9717 20.0 24.0) (* ratio 2000))
                 ;; (send *ri* :angle-vector-sequence
                 ;;       (list (float-vector 150.0 5.0 74.0 70.0 -75.0 -70.0 -6.0 20.0 -20.0 20.0 -34.0 -110.0 12.0 -38.0 74.0 -2.0 31.0)
                 ;;             ;;(float-vector 150.0 25.0 54.0 20.0 -120.0 -70.0 -6.0 20.0 -12.0 46.0 -79.0 -45.0 40.0 -22.0 27.0 -2.0 31.0)
@@ -920,6 +923,7 @@
                 ;;       (list 1400 1200 800))
                 ;;         (send *ri* :start-grasp :rarm)
                 ))
+         (send *ri* :stop-grasp use-arm)
          (if wait (send *ri* :wait-interpolation))
          )
         ((:slide1 :slide2)
@@ -974,8 +978,9 @@
     ;;swipe fridge door by larm
     (swipe-fridge-door :door-type door-type :ratio ratio :use-arm use-arm :wait wait)
 
+    ;; grasp-can-init merge
     ;;grasp can posing
-    (grasp-can-posing :door-type door-type :ratio ratio :use-arm use-arm :wait wait)
+    ;;    (grasp-can-posing :door-type door-type :ratio ratio :use-arm use-arm :wait wait)
 
     (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
     (send *ri* :wait-interpolation)
@@ -1002,13 +1007,119 @@
   )
 
 
-(defun grasp-can-init ()
-  (send *pr2* :head :neck-p :joint-angle 20)
-  (send *pr2* :head :neck-y :joint-angle 23)
-  (send *ri* :angle-vector (send *pr2* :angle-vector) 2000 :head-controller)
-  )
+;; grasp-can-init merge
+;; (defun grasp-can-init ()
+;;   (send *pr2* :head :neck-p :joint-angle 20)
+;;   (send *pr2* :head :neck-y :joint-angle 23)
+;;   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000 :head-controller)
+;;   )
 
+(defun approach-can (&optional (move t) &key (use-arm :larm) (timeout 10)) ;; approach-to-can
+  (let (tmp-cds
+        (pos-offset (float-vector -750 0 0))
+        (default-cds (float-vector 600 0 1160))
+        (end-time (ros::time+ (ros::time-now) (ros::time timeout)))
+        (ratio 0.5)
+        )
+    (while t
+      (when (ros::time> (ros::time-now) end-time) ;; timeout
+        (return-from approach-can nil))
+      ;; detection
+      (setq cds (check-detection-srv
+                 :type "georgia"
+                 :detection-topic "/kinect_head_c2/depth_registered/ObjectDetection"))
+      (setq tmp-cds (send (send (send *pr2* :worldcoords) :transformation
+                                (send cds :worldcoords)) :copy-worldcoords))
+      (send tmp-cds :orient 0 :z :world)
+      (warning-message 2 "go-waitp: ~A~%" (send *ri* :go-waitp))
+      ;; for inverse-kinematics initial pose
+      (send *pr2* :reset-pose)
+      (send *pr2* :torso :waist-z :joint-angle 130)
+      (cond
+       ((send *ri* :go-waitp) ;; moving (change arm position)
+        (setq tmp-cds
+              (send (send (send tmp-cds :copy-coords) :translate (float-vector -200 0 -100) :world)
+                    :transform (send *pr2* :worldcoords) :world))
+        (unless (send *pr2* use-arm :inverse-kinematics tmp-cds :rotation-axis t)
+          (send tmp-cds :locate default-cds :world)
+          (send *pr2* use-arm :inverse-kinematics tmp-cds  :rotation-axis t))
+        (cond
+         ((equal use-arm :rarm)
+          (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :rarm-controller))
+         (t
+          (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :larm-controller)))
+        nil
+        )
+       (t ;; not moving
+        (cond
+         ;; ik solved. Return from approach t
+         ((send *pr2* use-arm :inverse-kinematics
+                (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
+                      :transform (send *pr2* :worldcoords) :world)
+                :rotation-axis t)
+          (ros::ros-info "approach-can-finish")
+          ;; When already in the grasp region, just send arm to the backside of the target
+          (send *pr2* use-arm :inverse-kinematics
+                (send (send (send tmp-cds :copy-coords) :translate (float-vector -200 0 -100) :world)
+                      :transform (send *pr2* :worldcoords) :world)
+                :rotation-axis t)
+          (cond
+           ((equal use-arm :rarm)
+            (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :rarm-controller))
+           (t
+            (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :larm-controller)))
+          (return-from approach-can t)
+          )
+         (t ;; ik not solved. Fix position.
+          (let ((move-dis (send (send cds :copy-worldcoords) :translate pos-offset :world)))
+            (ros::ros-info "x:~A y:~A"
+                           (* ratio (* (aref (send move-dis :pos) 0) 0.001))
+                           (* ratio (* (aref (send move-dis :pos) 1) 0.001)))
+            (when move
+              (send *ri* :go-pos-unsafe-no-wait
+                    (* ratio (aref (send move-dis :pos) 0) 0.001)
+                    (* ratio (aref (send move-dis :pos) 1) 0.001)
+                    0)
+            )))))))))
 
+(defun catch-can (&key (use-arm :larm))
+  (let (tmp-cds)
+    (setq cds (check-detection-srv
+               :type "georgia"
+               :detection-topic "/kinect_head_c2/depth_registered/ObjectDetection"))
+    (setq tmp-cds (send (send (send *pr2* :worldcoords) :transformation
+                              (send cds :worldcoords)) :copy-worldcoords))
+    (send tmp-cds :orient 0 :z :world)
+    ;; for inverse-kinematics initial pose
+    (send *pr2* :reset-pose)
+    (send *pr2* :torso :waist-z :joint-angle 130)
+
+    (send *pr2* use-arm :inverse-kinematics
+          (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
+                :transform (send *pr2* :worldcoords) :world)
+          :rotation-axis t)
+    (cond
+     ((equal use-arm :rarm)
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 3000 :rarm-controller))
+     (t
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 3000 :larm-controller)))
+    (send *ri* :wait-interpolation)
+    (send *ri* :start-grasp use-arm)
+    ))
+
+(defun put-arm-to-the-outside (&key (use-arm :larm))
+  (let (av
+        (default-cds (send (make-coords) :translate (float-vector 600 0 1230) :world))
+        )
+    ;; for inverse-kinematics initial pose
+    (send *pr2* :reset-pose)
+    (send *pr2* :torso :waist-z :joint-angle 130)
+    (setq av (send *pr2* use-arm :inverse-kinematics default-cds :rotation-axis t))
+    (cond
+     ((eq use-arm :rarm)
+      (send *ri* :angle-vector av 4000 :rarm-controller))
+     (t
+      (send *ri* :angle-vector av 4000 :larm-controller)))))
 
 (defparameter *can-cds* nil)
 (defun grasp-can-motion (&key (use-arm :rarm) (rotation 20))
@@ -1089,8 +1200,14 @@
                        (rotation 20) (use-arm :rarm) (wait t))
   (if (eq use-arm :larm) (setq rotation (- rotation)))
   ;; move-to can spot for grasping
-  (move-to-can-spot :use-arm use-arm :rotation rotation :move move :pre-move pre-move)
+
+
+  ;; (move-to-can-spot :use-arm use-arm :rotation rotation :move move :pre-move pre-move)
   (grasp-can-init)
+  (approach-can :use-arm :larm)
+  (catch-can :use-arm :larm)
+  (put-arm-to-the-outside :use-arm :larm)
+
   (when (not move-only)
     (let (isgrasp res)
       ;; grasp can
