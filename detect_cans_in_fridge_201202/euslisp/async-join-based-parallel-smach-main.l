@@ -445,8 +445,11 @@
    fridge-demo
    '((base-go-to-fridge-init-pose)
 ;     (base-go-to-fridge)
+
      (open-fridge-door-initial-pose)
-     (move-to-and-open-fridge-door)
+     (approach-fridge-door)
+     (grasp-fridge-door)
+     (solve-ik-and-open-fridge-door)
      (move-forward-larm)
      (detach-fridge-handle)
      (swipe-fridge-door)

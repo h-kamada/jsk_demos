@@ -583,17 +583,13 @@
 
 (defun open-fridge-door-initial-pose (&key (wait t) (door-type :circle) (head-pitch 14) (torso-lift 130) (ratio 1))
 
-  (let (msg)
-    (ros::advertise "detectflag" std_msgs::Bool 1)
-    (setq msg (instance std_msgs::Bool))
-    (send msg :data t)
-    (ros::publish "detectflag" msg))
   (case door-type
     (:circle
      (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
      (send *pr2* :head :angle-vector (float-vector 0 head-pitch))
      (send *pr2* :torso :angle-vector (float-vector torso-lift))
      (send *ri* :angle-vector (send *pr2* :angle-vector) (* ratio 3000))
+     (send *ri* :stop-grasp)
      (if wait
          (send *ri* :wait-interpolation))
      )
@@ -1007,15 +1003,12 @@
 
 
 (defun grasp-can-init ()
-  (let (msg)
-    (setq msg (instance std_msgs::Bool))
-    (send msg :data nil)
-    (ros::publish "detectflag" msg)
-    )
   (send *pr2* :head :neck-p :joint-angle 20)
   (send *pr2* :head :neck-y :joint-angle 23)
   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000 :head-controller)
   )
+
+
 
 (defparameter *can-cds* nil)
 (defun grasp-can-motion (&key (use-arm :rarm) (rotation 20))

@@ -16,6 +16,10 @@
     )
    (t
     (open-fridge-door-initial-pose)
+    (let (msg)
+      (setq msg (instance std_msgs::Bool))
+      (send msg :data t)
+      (ros::publish "detectflag" msg))
     ))
   (send server :set-succeeded (send server :result))
   )
@@ -23,6 +27,8 @@
 (setq s (instance ros::simple-action-server :init
                   "open_fridge_door_initial_pose" roseus_smach::Sub5Action
                   :execute-cb 'cb))
+
+(ros::advertise "detectflag" std_msgs::Bool 10)
 
 (ros::rate 10)
 (do-until-key
