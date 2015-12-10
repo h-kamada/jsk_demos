@@ -13,16 +13,25 @@
   (ros::ros-info "solve-ik-and-open-fridge-door callback func called")
   (cond
    (*dryrun*
+    (ros::ros-info "solve-ik-and-open-fridge-door (dryrun): wait 5s")
+    (unix:sleep 5)
+    (ros::ros-info "solve-ik-and-open-fridge-door (dryrun): wait end")
     )
    (t
     (solve-ik-and-open-fridge-door)
     ))
+  (let (msg)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data nil) ;; end detecting fridge door
+    (ros::publish "detectfridgeflag" msg))
   (send server :set-succeeded (send server :result))
   )
 
 (setq s (instance ros::simple-action-server :init
                   "solve_ik_and_open_fridge_door" roseus_smach::Sub5Action
                   :execute-cb 'cb))
+
+(ros::advertise "detectfridgeflag" std_msgs::Bool 10)
 
 (ros::rate 10)
 (do-until-key

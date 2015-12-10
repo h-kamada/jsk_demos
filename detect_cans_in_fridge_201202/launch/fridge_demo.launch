@@ -16,9 +16,6 @@
   <node pkg="roseus" type="roseus" name="open_fridge_door_initial_pose" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/open-fridge-door-initial-pose.l"  />
 
-  <node pkg="roseus" type="roseus" name="look_at_fridge" output="screen"
-        args="$(find detect_cans_in_fridge_201202)/euslisp/look-at-fridge.l"  />
-
   <node pkg="roseus" type="roseus" name="approach_fridge_door" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/approach-fridge-door.l"  />
 
@@ -37,17 +34,17 @@
   <node pkg="roseus" type="roseus" name="swipe_fridge_door" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/swipe-fridge-door.l"  />
 
-  <node pkg="roseus" type="roseus" name="grasp_can_posing" output="screen"
-        args="$(find detect_cans_in_fridge_201202)/euslisp/grasp-can-posing.l"  />
-
-  <node pkg="roseus" type="roseus" name="move_to_can_spot" output="screen"
-        args="$(find detect_cans_in_fridge_201202)/euslisp/move-to-can-spot.l"  />
-
   <node pkg="roseus" type="roseus" name="grasp_can_init" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/grasp-can-init.l"  />
 
-  <node pkg="roseus" type="roseus" name="grasp_can_motion" output="screen"
-        args="$(find detect_cans_in_fridge_201202)/euslisp/grasp-can-motion.l"  />
+  <node pkg="roseus" type="roseus" name="approach_can" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/approach-can.l"  />
+
+  <node pkg="roseus" type="roseus" name="catch_can" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/catch-can.l"  />
+
+  <node pkg="roseus" type="roseus" name="put_arm_to_the_outside" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/put-arm-to-the-outside.l"  />
 
   <node pkg="roseus" type="roseus" name="go_back_from_fridge" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/go-back-from-fridge.l"  />

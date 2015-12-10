@@ -384,10 +384,10 @@
      (move-forward-larm (:rarm :larm)) ;; rarm add
      (detach-fridge-handle (:rgripper))
      (swipe-fridge-door (:larm :rarm))
-     (grasp-can-posing (:rarm :larm :head))
-     (move-to-can-spot (:base))
-     (grasp-can-init (:head))
-     (grasp-can-motion (:larm :lgripper))
+     (grasp-can-init (:rarm :larm :head))
+     (approach-can (:base :larm))
+     (catch-can (:larm :lgripper))
+     (put-arm-to-the-outside (:larm))
      (go-back-from-fridge (:base :lgripper)) ;; lgripper add
      (close-fridge (:rarm))
      ))
@@ -416,9 +416,10 @@
      ))
   (make-hsm
    grasp-can
-   '((move-to-can-spot (:base))
-     (grasp-can-init (:head))
-     (grasp-can-motion (:larm :lgripper))
+   '((grasp-can-init (:rarm :larm :head))
+     (approach-can (:base :larm))
+     (catch-can (:larm :lgripper))
+     (put-arm-to-the-outside (:larm))
      ))
   (make-hsm
    close
@@ -453,10 +454,10 @@
      (move-forward-larm)
      (detach-fridge-handle)
      (swipe-fridge-door)
-     (grasp-can-posing)
-     (move-to-can-spot)
      (grasp-can-init)
-     (grasp-can-motion)
+     (approach-can)
+     (catch-can)
+     (put-arm-to-the-outside)
      (go-back-from-fridge)
      (close-fridge)
      ))
@@ -465,7 +466,7 @@
       (smach-exec-in-stages fridge-demo)
       )
    (t
-    (smach-exec fridge-demo)
+    (Smach-exec fridge-demo)
     )))
 
 (defun return-t (userdata)
@@ -483,10 +484,10 @@
      (move-forward-larm nil return-t)
      (detach-fridge-handle nil return-t)
      (swipe-fridge-door nil return-t)
-     (grasp-can-posing nil return-t)
-     (move-to-can-spot nil return-t)
      (grasp-can-init nil return-t)
-     (grasp-can-motion nil return-t)
+     (approach-can nil return-t)
+     (catch-can nil return-t)
+     (put-arm-to-the-outside nil return-t)
      (go-back-from-fridge nil return-t)
      (close-fridge nil return-t)
      ))

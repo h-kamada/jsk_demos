@@ -1,6 +1,6 @@
 
 (ros::load-ros-manifest "roseus_smach")
-(ros::roseus "move_forward_larm_server")
+(ros::roseus "catch_can_server")
 
 (defvar *dryrun* (ros::get-param "/dryrun"))
 (when (null *dryrun*)
@@ -10,7 +10,7 @@
   )
 
 (defun cb (server goal)
-  (ros::ros-info "move-forward-larm callback func called")
+  (ros::ros-info "catch-can callback func called")
   (cond
    (*dryrun*
     (ros::ros-info "move-forward-larm(dryrun): wait 5s")
@@ -18,17 +18,17 @@
     (ros::ros-info "move-forward-larm(dryrun): wait end")
     )
    (t
-    (move-forward-larm)
+    (catch-can)
     ))
   (let (msg)
     (setq msg (instance std_msgs::Bool))
-    (send msg :data t) ;; start detecting can
+    (send msg :data nil) ;; finish detecting can
     (ros::publish "detectcanflag" msg))
   (send server :set-succeeded (send server :result))
   )
 
 (setq s (instance ros::simple-action-server :init
-                  "move_forward_larm" roseus_smach::Sub5Action
+                  "catch_can" roseus_smach::Sub5Action
                   :execute-cb 'cb))
 
 (ros::advertise "detectcanflag" std_msgs::Bool 10)

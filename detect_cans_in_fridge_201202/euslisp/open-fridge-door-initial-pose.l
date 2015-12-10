@@ -13,14 +13,17 @@
   (ros::ros-info "open-fridge-door-initial-pose callback func called")
   (cond
    (*dryrun*
+    (ros::ros-info "open-fridge-door-initial-pose (dryrun): wait 5s")
+    (unix:sleep 5)
+    (ros::ros-info "open-fridge-door-initial-pose (dryrun): wait end")
     )
    (t
     (open-fridge-door-initial-pose)
-    (let (msg)
-      (setq msg (instance std_msgs::Bool))
-      (send msg :data t)
-      (ros::publish "detectflag" msg))
     ))
+  (let (msg)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data t) ;; start detecting fridge
+    (ros::publish "detectfridgeflag" msg))
   (send server :set-succeeded (send server :result))
   )
 
@@ -28,7 +31,7 @@
                   "open_fridge_door_initial_pose" roseus_smach::Sub5Action
                   :execute-cb 'cb))
 
-(ros::advertise "detectflag" std_msgs::Bool 10)
+(ros::advertise "detectfridgeflag" std_msgs::Bool 10)
 
 (ros::rate 10)
 (do-until-key
