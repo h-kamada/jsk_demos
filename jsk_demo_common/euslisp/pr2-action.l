@@ -405,7 +405,8 @@
 
     (when move-robot
       ;; (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
-      (send *ri* :angle-vector-sequence (reverse avs) tms))
+      ;; add rarm-controller 直すべき
+      (send *ri* :angle-vector-sequence (reverse avs) tms :rarm-controller))
     ;; finalize
     (cond
      ((integerp wait-time)
@@ -603,6 +604,20 @@
      ))
   )
 
+(defun preset (&optional (move nil))
+  (send *pr2* :reset-pose)
+  (send *pr2* :torso :waist-z :joint-angle 130)
+  (when move
+    (send *ri* :angle-vector (send *pr2* :angle-vector))
+    ))
+
+(defun treset (&optional (move nil))
+  (send *pr2* :reset-pose)
+  (when move
+    (send *ri* :angle-vector (send *pr2* :angle-vector))
+    ))
+
+
 (defparameter *fridge-handle-cds* nil)
 (defun approach-fridge-door (&key (door-type :circle) (ratio 1) (look-around nil) (head-pitch 14) (torso-lift 130) (move t) (open-fridge-func #'open-fridge-traj) (wait t))
   (let (ret
@@ -664,7 +679,7 @@
                                      :detection-topic "/kinect_head/rgb/ObjectDetection"))
           )
          (t ;; simulation mode
-          (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 1112)))))
+          (setq cds (send (make-cube 60 60 60) :translate (float-vector 777 98 111212)))))
         ;; (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
         ;; (y-or-n-p "Can I start open fridge? ")
         (when cds
@@ -680,7 +695,7 @@
             ((:slide1 :slide2)
              (send *pr2* :head :angle-vector (float-vector 0 50))
              (send *pr2* :torso :angle-vector (float-vector 130))
-             (send *ri* :angle-vector (send *pr2* :angle-vector) (* ratio 3000))
+             (send *ri* :angle-vector (send *pr2* :angle-vector) (* ratio 1000))
              (send *ri* :wait-interpolation)
              ))
 
@@ -701,13 +716,21 @@
             (send *pr2* :reset-pose)
             (setq hand-av (send *pr2* :rarm :angle-vector))
             (send *pr2* :angle-vector prev-av)
+            (send *pr2* :torso :waist-z :joint-angle 130) ;; torso 動かないように
             (send *pr2* :rarm :angle-vector hand-av))
           (case door-type
             (:circle
              (cond
-              ((move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector -100 0 0) :local)
-                       :use-torso nil
-                       :rotation-axis t :sec 1000 :move-robot t)
+              (;; move-arm はcontroller全てに送ってしまうので、こう書き換えた
+               ;; これによりheadが動くのも防ぐ
+               (send *pr2* :inverse-kinematics
+                     (send (send cds :copy-worldcoords) :translate (float-vector -100 0 0) :local)
+                     :move-arm :rarm :rotation-axis t :use-torso nil :revert-if-fail nil
+                     :debug-view nil)
+               (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :rarm-controller)
+               ;; (move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector -100 0 0) :local)
+               ;;         :use-torso nil
+               ;;         :rotation-axis t :sec 1000 :move-robot t)
                t)
               (t
                (ros::ros-warn "Could not solve ik, return from approach-fridge-door")
@@ -799,19 +822,29 @@
          (float-vector 130.072 22.9146 57.2941 -0.001244 -117.452 0.00187 -5.72958 -360.0 -2.05726 -16.4737 -77.9557 -76.7 -162.904 -77.8544 254.584 23.0407 18.474)))
     (send *pr2* :angle-vector prev-av))
   (cond
-   ((move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector 25 0 0) :local)
-              :use-torso nil
-              :rotation-axis t :sec 1000 :move-robot t) ;; 1000必要か
+   (;;ここもmove-armを使わない
+    (send *pr2* :inverse-kinematics
+          (send (send cds :copy-worldcoords) :translate (float-vector 0 0 0) :local)
+          :move-arm :rarm :rotation-axis t :use-torso nil :revert-if-fail nil
+          :debug-view nil)
+    (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :rarm-controller)
+    ;; (move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector 25 0 0) :local)
+    ;;           :use-torso nil
+    ;;           :rotation-axis t :sec 1000 :move-robot t) ;; 1000必要か
     t)
    (t
     (ros::ros-warn "Could not solve ik, return from approach-fridge-door")
     (return-from grasp-fridge-door nil)))
-  (let ((grasp-ret (if move-robot (send *ri* :start-grasp :rarm :gain 0.1 :objects nil) 10)))
-    (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
-               (and grasp-check
-                    (< grasp-ret 8))) ;; grasp
-      (ros::ros-warn "Grasp handle failed, return from grasp-fridge-door")
-      (return-from grasp-fridge-door nil))
+  (let ((grasp-ret (if move-robot
+                       ;; grasp直後にik解くためにこうした
+                       ;; (send *ri* :start-grasp :rarm :gain 0.1 :objects nil) 10)))
+                       (send *ri* :move-gripper :rarm 0.0 :effort (* 2000 0.1) :wait nil) 10)))
+    ;; とりあえずcomment out   solve-ikの後にチェックは入るべき
+    ;; (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
+    ;;            (and grasp-check
+    ;;                 (< grasp-ret 8))) ;; grasp
+    ;;   (ros::ros-warn "Grasp handle failed, return from grasp-fridge-door")
+    ;;   (return-from grasp-fridge-door nil))
     (return-from grasp-fridge-door t)))
 
 (defun solve-ik-and-open-fridge-door (&optional (cds nil) &key (door-type :circle))
@@ -1017,6 +1050,7 @@
 (defun approach-can (&key (move t) (use-arm :larm) (timeout 10)) ;; approach-to-can
   (let (tmp-cds
         (pos-offset (float-vector -750 0 0))
+        (distance-thre 900)
         (default-cds (float-vector 600 0 1160))
         (end-time (ros::time+ (ros::time-now) (ros::time timeout)))
         (ratio 0.5)
@@ -1031,43 +1065,59 @@
       (setq tmp-cds (send (send (send *pr2* :worldcoords) :transformation
                                 (send cds :worldcoords)) :copy-worldcoords))
       (send tmp-cds :orient 0 :z :world)
+      (setq *cds* tmp-cds)
       (warning-message 2 "go-waitp: ~A~%" (send *ri* :go-waitp))
       ;; for inverse-kinematics initial pose
       (send *pr2* :reset-pose)
       (send *pr2* :torso :waist-z :joint-angle 130)
       (cond
        ((send *ri* :go-waitp) ;; moving (change arm position)
-        (setq tmp-cds
-              (send (send (send tmp-cds :copy-coords) :translate (float-vector -200 0 -100) :world)
-                    :transform (send *pr2* :worldcoords) :world))
-        (unless (send *pr2* use-arm :inverse-kinematics tmp-cds :rotation-axis t)
-          (send tmp-cds :locate default-cds :world)
-          (send *pr2* use-arm :inverse-kinematics tmp-cds  :rotation-axis t))
-        (cond
-         ((equal use-arm :rarm)
-          (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :rarm-controller))
-         (t
-          (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :larm-controller)))
-        nil
-        )
+        ;; (setq tmp-cds
+        ;;       (send (send (send tmp-cds :copy-coords) :translate (float-vector -200 0 -100) :world)
+        ;;             :transform (send *pr2* :worldcoords) :world))
+        ;; (unless (send *pr2* use-arm :inverse-kinematics tmp-cds :rotation-axis t)
+        ;;   (send tmp-cds :locate default-cds :world)
+        ;;   (send *pr2* use-arm :inverse-kinematics tmp-cds  :rotation-axis t))
+        ;; (warning-message 5 "moving send angle~%")
+        ;; (cond
+        ;;  ((equal use-arm :rarm)
+        ;;   (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :rarm-controller))
+        ;;  (t
+        ;;   (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :larm-controller)))
+        ;; nil
+        (let ((tv (send tmp-cds :pos))
+              (dif (- (aref (send tmp-cds :pos) 0) distance-thre))
+              rate)
+          (when (> dif 500) (setq dif 500))
+          (setq dif (* dif 0.2))
+          (setf (aref tv 0) 600
+                (aref tv 2) (- 1160 dif))
+          (ros::ros-info "tv:~A" tv)
+          (send tmp-cds :locate tv :world)
+          (send *pr2* use-arm :inverse-kinematics tmp-cds :rotation-axis t)
+          (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :larm-controller)
+          ))
        (t ;; not moving
         (cond
          ;; ik solved. Return from approach t
-         ((send *pr2* use-arm :inverse-kinematics
-                (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
-                      :transform (send *pr2* :worldcoords) :world)
-                :rotation-axis t)
+         ((and
+           (< (aref (send tmp-cds :pos) 0) distance-thre)
+           (send *pr2* use-arm :inverse-kinematics
+                 (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
+                       :transform (send *pr2* :worldcoords) :world)
+                 :rotation-axis t))
           (ros::ros-info "approach-can-finish")
           ;; When already in the grasp region, just send arm to the backside of the target
           (send *pr2* use-arm :inverse-kinematics
-                (send (send (send tmp-cds :copy-coords) :translate (float-vector -200 0 -100) :world)
+                (send (send (send tmp-cds :copy-coords) :translate (float-vector -100 0 0) :world)
                       :transform (send *pr2* :worldcoords) :world)
                 :rotation-axis t)
+          (warning-message 5 "not moving send angle~%")
           (cond
            ((equal use-arm :rarm)
-            (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :rarm-controller))
+            (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :rarm-controller))
            (t
-            (send *ri* :angle-vector (send *pr2* :angle-vector) 4000 :larm-controller)))
+            (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :larm-controller)))
           (return-from approach-can t)
           )
          (t ;; ik not solved. Fix position.
@@ -1095,31 +1145,33 @@
     (send *pr2* :torso :waist-z :joint-angle 130)
 
     (send *pr2* use-arm :inverse-kinematics
-          (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
+          (send (send (send tmp-cds :copy-coords) :translate (float-vector 40 0 0) :world)
                 :transform (send *pr2* :worldcoords) :world)
           :rotation-axis t)
     (cond
      ((equal use-arm :rarm)
-      (send *ri* :angle-vector (send *pr2* :angle-vector) 3000 :rarm-controller))
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :rarm-controller))
      (t
-      (send *ri* :angle-vector (send *pr2* :angle-vector) 3000 :larm-controller)))
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :larm-controller)))
     (send *ri* :wait-interpolation)
     (send *ri* :start-grasp use-arm)
     ))
 
 (defun put-arm-to-the-outside (&key (use-arm :larm))
-  (let (av
-        (default-cds (send (make-coords) :translate (float-vector 600 0 1230) :world))
-        )
-    ;; for inverse-kinematics initial pose
-    (send *pr2* :reset-pose)
-    (send *pr2* :torso :waist-z :joint-angle 130)
-    (setq av (send *pr2* use-arm :inverse-kinematics default-cds :rotation-axis t))
-    (cond
-     ((eq use-arm :rarm)
-      (send *ri* :angle-vector av 3000 :rarm-controller))
-     (t
-      (send *ri* :angle-vector av 3000 :larm-controller)))))
+  ;; (let (av
+  ;;       (default-cds (send (make-coords) :translate (float-vector 700 0 1200) :world))
+  ;;       )
+  ;;   ;; for inverse-kinematics initial pose
+  ;;   (send *pr2* :reset-pose)
+  ;;   (send *pr2* :torso :waist-z :joint-angle 130)
+  ;;   (setq av (send *pr2* use-arm :inverse-kinematics default-cds :rotation-axis t))
+  ;;   (cond
+  ;;    ((eq use-arm :rarm)
+  ;;     (send *ri* :angle-vector av 3000 :rarm-controller))
+  ;;    (t
+  ;;     (send *ri* :angle-vector av 3000 :larm-controller)))))
+  (approach-can) ;; temporary
+  )
 
 (defparameter *can-cds* nil)
 (defun grasp-can-motion (&key (use-arm :rarm) (rotation 20))
@@ -1276,7 +1328,9 @@
         (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
         ))
   ;;  (pr2-tuckarm-pose use-arm :outside)
-  (send *ri* :angle-vector (send *pr2* :reset-pose))
+  (send *pr2* :reset-pose)
+  (send *pr2* :torso :waist-z :joint-angle 130)
+  (send *ri* :angle-vector (send *pr2* :angle-vector))
   t
   )
 

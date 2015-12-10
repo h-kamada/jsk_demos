@@ -447,7 +447,7 @@
    '(
 ;     (base-go-to-fridge-init-pose)
     ;; (base-go-to-fridge)
-;     (open-fridge-door-initial-pose)
+     (open-fridge-door-initial-pose)
      (approach-fridge-door)
 ;     (grasp-fridge-door)
 
@@ -501,11 +501,6 @@
     (smach-exec fridge-demo)
     )))
 
-(defun ppr2 ()
-  (load "package://pr2eus/pr2-interface.l")
-  (pr2-init)
-  )
-
 (defun end () ;; end detection
   (let (msg)
     (setq msg (instance std_msgs::Bool))
@@ -528,11 +523,32 @@
     (ros::publish "detectcanflag" msg)
     ))
 
+(load "package://jsk_perception/euslisp/detection_interface.l")
+(load "package://pr2eus/pr2-interface.l")
+(pr2-init)
+
+(defun getfridge ()
+  (fridge)
+  (setq cds (check-detection-srv
+             :type "fridge"
+             :detection-topic "/kinect_head/rgb/ObjectDetection"
+             )))
+(defun getcan ()
+  (can)
+  (setq cds (check-detection-srv
+             :type "georgia"
+             :detection-topic "/kinect_head_c2/depth_registered/ObjectDetection")))
+
 (defun preset ()
   (ppr2)
   (send *ri* :go-stop)
   (send *ri* :angle-vector (send *pr2* :reset-pose))
   )
+(defun treset (&optional (move nil))
+  (send *pr2* :reset-pose)
+  (when move
+    (send *ri* :angle-vector (send *pr2* :angle-vector))
+    ))
 
 (ros::advertise "detectcanflag" std_msgs::Bool 10)
 (ros::advertise "detectfridgeflag" std_msgs::Bool 10)
