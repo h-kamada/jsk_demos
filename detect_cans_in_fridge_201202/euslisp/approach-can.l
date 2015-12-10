@@ -12,6 +12,9 @@
   (ros::ros-info "approach-can callback func called")
   (cond
    (*dryrun*
+    (ros::ros-info "approach-can (dryrun): wait 5s")
+    (unix:sleep 5)
+    (ros::ros-info "approach-can (dryrun): wait end")
     )
    (t
     (approach-can :use-arm :larm)

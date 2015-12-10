@@ -435,7 +435,7 @@
 ;; actions
 ;;
 (warn ";; define grasp-can-single")
-(defun grasp-can-single (obj &key (rotation 0) (use-arm :rarm) (grasp-depth 35)(func-time 7))
+(defun grasp-can-single (obj &key (rotation 0) (use-arm :larm) (grasp-depth 35)(func-time 7))
   (let (via1 via2 tar orig-av (mvt (* (/ (- func-time 4) 4.0) 1000)));; mvt is about 3000. we assume it takes 4 sec other than sending :angle-vector, and there are 4 :angle-vector in this funciton
     (send *ri* :stop-grasp use-arm)
     (send *tfb* :send-transform
@@ -860,7 +860,7 @@
         ))
   )
 
-(defun swipe-fridge-door (&key (door-type :circle) (ratio 1) (use-arm :rarm) (wait t))
+(defun swipe-fridge-door (&key (door-type :circle) (ratio 1) (use-arm :larm) (wait t))
   (case door-type
     (:circle
      ;; free door handle
@@ -936,7 +936,7 @@
 (defvar *fridge-rotation-threshold* 0.09)
 (defun open-fridge-door (&key (open-fridge-func #'open-fridge-traj)
                               (torso-lift 130) (head-pitch 14)
-                              (use-arm :rarm) (move t)
+                              (use-arm :larm) (move t)
                               (door-type :circle) (look-around nil) ;; :circle, :slide1, :slide2
                               (func-time 80)
                               (wait t)
@@ -1014,7 +1014,7 @@
 ;;   (send *ri* :angle-vector (send *pr2* :angle-vector) 2000 :head-controller)
 ;;   )
 
-(defun approach-can (&optional (move t) &key (use-arm :larm) (timeout 10)) ;; approach-to-can
+(defun approach-can (&key (move t) (use-arm :larm) (timeout 10)) ;; approach-to-can
   (let (tmp-cds
         (pos-offset (float-vector -750 0 0))
         (default-cds (float-vector 600 0 1160))
@@ -1174,14 +1174,15 @@
     (return-from grasp-can-motion isgrasp)
     ))
 
-(defun go-back-from-fridge (&key (isgrasp t) (move t) (use-arm :rarm) (rotation 20))
+(defun go-back-from-fridge (&key (isgrasp t) (move t) (use-arm :larm) (rotation 20))
   (when isgrasp
     (when move
       (case use-arm
         (:rarm
          (send *ri* :go-pos-unsafe -0.3 0.05 (- rotation)))
         (:larm
-         (send *ri* :go-pos-unsafe -0.3 -0.2 (- rotation)))))
+         (send *ri* :go-pos-unsafe -0.385 -0.02 -4))))
+         ;; (send *ri* :go-pos-unsafe -0.3 -0.2 (- rotation)))))
     (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
     (return-from go-back-from-fridge t))
   ;; (unix::sleep 2)
@@ -1197,7 +1198,7 @@
 (warn ";; define grasp-can")
 (defvar *use-arm-navigation* nil)
 (defun grasp-can (&key (move t) (pre-move t) (post-move t) (move-only nil)
-                       (rotation 20) (use-arm :rarm) (wait t))
+                       (rotation 20) (use-arm :larm) (wait t))
   (if (eq use-arm :larm) (setq rotation (- rotation)))
   ;; move-to can spot for grasping
 
@@ -1234,7 +1235,7 @@
   )
 
 (warn ";; define close-fridge")
-(defun close-fridge (&key (use-arm :rarm) (wait t))
+(defun close-fridge (&key (use-arm :larm) (wait t))
   ;; close the door of fridge
   (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
 
@@ -1274,7 +1275,8 @@
         (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
         (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
         ))
-  (pr2-tuckarm-pose use-arm :outside)
+  ;;  (pr2-tuckarm-pose use-arm :outside)
+  (send *ri* :angle-vector (send *pr2* :reset-pose))
   t
   )
 

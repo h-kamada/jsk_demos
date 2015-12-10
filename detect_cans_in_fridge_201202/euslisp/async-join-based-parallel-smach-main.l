@@ -444,22 +444,24 @@
 (defun demo3 (&optional (stages nil))
   (make-hsm
    fridge-demo
-   '((base-go-to-fridge-init-pose)
-;     (base-go-to-fridge)
-
-     (open-fridge-door-initial-pose)
+   '(
+;     (base-go-to-fridge-init-pose)
+    ;; (base-go-to-fridge)
+;     (open-fridge-door-initial-pose)
      (approach-fridge-door)
-     (grasp-fridge-door)
-     (solve-ik-and-open-fridge-door)
-     (move-forward-larm)
-     (detach-fridge-handle)
-     (swipe-fridge-door)
-     (grasp-can-init)
-     (approach-can)
-     (catch-can)
-     (put-arm-to-the-outside)
-     (go-back-from-fridge)
-     (close-fridge)
+;     (grasp-fridge-door)
+
+     ;; (solve-ik-and-open-fridge-door)
+     ;; (move-forward-larm)
+     ;; (detach-fridge-handle)
+     ;; (swipe-fridge-door)
+     ;; (grasp-can-init)
+     ;; (approach-can)
+     ;; (catch-can)
+     ;; (put-arm-to-the-outside)
+
+     ;; (go-back-from-fridge)
+     ;; (close-fridge)
      ))
   (cond
    (stages
@@ -504,6 +506,36 @@
   (pr2-init)
   )
 
+(defun end () ;; end detection
+  (let (msg)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data nil)
+    (ros::publish "detectcanflag" msg) ;; end detecting can
+    (ros::publish "detectfridgeflag" msg) ;; end detecting fridge
+    ))
+
+(defun fridge ()
+  (let (msg)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data t) ;; start detecting fridge
+    (ros::publish "detectfridgeflag" msg)
+    ))
+
+(defun can ()
+  (let (msg)
+    (setq msg (instance std_msgs::Bool))
+    (send msg :data t) ;; start detecting can
+    (ros::publish "detectcanflag" msg)
+    ))
+
+(defun preset ()
+  (ppr2)
+  (send *ri* :go-stop)
+  (send *ri* :angle-vector (send *pr2* :reset-pose))
+  )
+
+(ros::advertise "detectcanflag" std_msgs::Bool 10)
+(ros::advertise "detectfridgeflag" std_msgs::Bool 10)
 
 
 (warn "~%")
