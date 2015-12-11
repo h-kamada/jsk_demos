@@ -728,6 +728,7 @@
                      :move-arm :rarm :rotation-axis t :use-torso nil :revert-if-fail nil
                      :debug-view nil)
                (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :rarm-controller)
+               (send *ri* :wait-interpolation)
                ;; (move-arm :rarm (send (send cds :copy-worldcoords) :translate (float-vector -100 0 0) :local)
                ;;         :use-torso nil
                ;;         :rotation-axis t :sec 1000 :move-robot t)
@@ -759,7 +760,10 @@
              ;;                    )))
              )
             )
-          (if ret (return-from approach-fridge-door cds)))
+          ;; if -> when で何か変わった？？
+          (when ret
+            (warning-message 2 "return")
+            (return-from approach-fridge-door cds)))
         (if (and (boundp '*use-voicetext*) *use-voicetext*)
             (cond
              ((and (boundp '*use-english*) *use-english*)
@@ -773,7 +777,7 @@
         (send *ri* :wait-interpolation)
         )
        (t ;;  there is much difference
-        (if move
+        (when move
             (cond
              (wait
               (send *ri* :go-pos-unsafe
@@ -1048,9 +1052,11 @@
 ;;   )
 
 (defun approach-can (&key (move t) (use-arm :larm) (timeout 10)) ;; approach-to-can
+  ;; make sure torso joint-angle is 130! If not, PR2 will grasp under point
   (let (tmp-cds
         (pos-offset (float-vector -750 0 0))
         (distance-thre 900)
+        (y-thre 100) ;; 追っかけ手の動き幅(y)
         (default-cds (float-vector 600 0 1160))
         (end-time (ros::time+ (ros::time-now) (ros::time timeout)))
         (ratio 0.5)
@@ -1088,49 +1094,60 @@
         (let ((tv (send tmp-cds :pos))
               (dif (- (aref (send tmp-cds :pos) 0) distance-thre))
               rate)
-          (when (> dif 500) (setq dif 500))
-          (setq dif (* dif 0.2))
+          (when (> dif 500) (setq dif 500)) ;; diff距離
+          (setq dif (* dif 0.2)) ;; 上限10mm くらいに設定
           (setf (aref tv 0) 600
                 (aref tv 2) (- 1160 dif))
+          (when (> (abs (aref tv 1)) y-thre)
+            ;; y = (raw_y / |raw_y|) * 100
+            (setf (aref tv 1) (* (/ (aref tv 1) (abs (aref tv 1))) 100))
+            )
           (ros::ros-info "tv:~A" tv)
           (send tmp-cds :locate tv :world)
-          (send *pr2* use-arm :inverse-kinematics tmp-cds :rotation-axis t)
-          (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :larm-controller)
-          ))
+          (when use-arm
+            (send *pr2* use-arm :inverse-kinematics tmp-cds :rotation-axis t)
+            (send *ri* :angle-vector (send *pr2* :angle-vector) 1000 :larm-controller)
+          )))
        (t ;; not moving
-        (cond
-         ;; ik solved. Return from approach t
-         ((and
-           (< (aref (send tmp-cds :pos) 0) distance-thre)
-           (send *pr2* use-arm :inverse-kinematics
-                 (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
-                       :transform (send *pr2* :worldcoords) :world)
-                 :rotation-axis t))
-          (ros::ros-info "approach-can-finish")
-          ;; When already in the grasp region, just send arm to the backside of the target
-          (send *pr2* use-arm :inverse-kinematics
-                (send (send (send tmp-cds :copy-coords) :translate (float-vector -100 0 0) :world)
-                      :transform (send *pr2* :worldcoords) :world)
-                :rotation-axis t)
-          (warning-message 5 "not moving send angle~%")
+        (let ((pr2rot (elt (elt (rpy-angle (send (send *tfl* :lookup-transform "/map" "base_footprint" (ros::time 0)) :rot)) 0) 0)))
+          (ros::ros-info "pr2rot:~A" pr2rot)
           (cond
-           ((equal use-arm :rarm)
-            (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :rarm-controller))
-           (t
-            (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :larm-controller)))
-          (return-from approach-can t)
-          )
-         (t ;; ik not solved. Fix position.
-          (let ((move-dis (send (send cds :copy-worldcoords) :translate pos-offset :world)))
-            (ros::ros-info "x:~A y:~A"
-                           (* ratio (* (aref (send move-dis :pos) 0) 0.001))
-                           (* ratio (* (aref (send move-dis :pos) 1) 0.001)))
-            (when move
-              (send *ri* :go-pos-unsafe-no-wait
-                    (* ratio (aref (send move-dis :pos) 0) 0.001)
-                    (* ratio (aref (send move-dis :pos) 1) 0.001)
-                    0)
-            )))))))))
+           ;; ik solved. Return from approach t
+           ((and
+             (< (abs pr2rot) 0.01)
+             (< (aref (send tmp-cds :pos) 0) distance-thre)
+             use-arm
+             (send *pr2* use-arm :inverse-kinematics
+                   (send (send (send tmp-cds :copy-coords) :translate (float-vector 0 0 0) :world)
+                         :transform (send *pr2* :worldcoords) :world)
+                   :rotation-axis t))
+            (ros::ros-info "approach-can-finish")
+            ;; When already in the grasp region, just send arm to the backside of the target
+            (send *pr2* use-arm :inverse-kinematics
+                  (send (send (send tmp-cds :copy-coords) :translate (float-vector -100 0 0) :world)
+                        :transform (send *pr2* :worldcoords) :world)
+                  :rotation-axis t)
+            (warning-message 5 "not moving send angle tmp-cds:~A~%" tmp-cds)
+            (cond
+             ((equal use-arm :rarm)
+              (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :rarm-controller))
+             (t
+              (send *ri* :angle-vector (send *pr2* :angle-vector) 1500 :larm-controller)))
+            (return-from approach-can t)
+            )
+           (t ;; ik not solved. Fix position.
+            (let ((move-dis (send (send cds :copy-worldcoords) :translate pos-offset :world))
+                  )
+              (ros::ros-info "x:~A y:~A pr2rot:~A"
+                             (* ratio (* (aref (send move-dis :pos) 0) 0.001))
+                             (* ratio (* (aref (send move-dis :pos) 1) 0.001))
+                             (* ratio (- pr2rot)))
+              (when move
+                (send *ri* :go-pos-unsafe-no-wait
+                      (* ratio (aref (send move-dis :pos) 0) 0.001)
+                      (* ratio (aref (send move-dis :pos) 1) 0.001)
+                      (* 80 (- pr2rot))) ;; magic number 80
+                ))))))))))
 
 (defun catch-can (&key (use-arm :larm))
   (let (tmp-cds)
@@ -1233,7 +1250,8 @@
         (:rarm
          (send *ri* :go-pos-unsafe -0.3 0.05 (- rotation)))
         (:larm
-         (send *ri* :go-pos-unsafe -0.385 -0.02 -4))))
+         (send *ri* :go-pos-unsafe -0.385 -0.205 1))))
+         ;; (send *ri* :go-pos-unsafe -0.385 -0.02 -4)))) ;;yesterday
          ;; (send *ri* :go-pos-unsafe -0.3 -0.2 (- rotation)))))
     (send *ri* :ros-wait 0.0 :spin-self t :spin t) ;; attention-check ...
     (return-from go-back-from-fridge t))
@@ -1287,7 +1305,7 @@
   )
 
 (warn ";; define close-fridge")
-(defun close-fridge (&key (use-arm :larm) (wait t))
+(defun close-fridge (&key (use-arm :larm) (harf nil) (wait t))
   ;; close the door of fridge
   (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
 
