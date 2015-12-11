@@ -18,6 +18,7 @@
     (detach-fridge-handle)
     ))
   (send server :set-succeeded (send server :result))
+  (send *pr2* :reset-pose) ;; for another try
   )
 
 (setq s (instance ros::simple-action-server :init

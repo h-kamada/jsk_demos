@@ -25,6 +25,7 @@
     (send msg :data nil) ;; end detecting fridge door
     (ros::publish "detectfridgeflag" msg))
   (send server :set-succeeded (send server :result))
+  (send *pr2* :reset-pose) ;; for another try
   )
 
 (setq s (instance ros::simple-action-server :init

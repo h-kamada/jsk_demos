@@ -445,23 +445,21 @@
   (make-hsm
    fridge-demo
    '(
-;     (base-go-to-fridge-init-pose)
-    ;; (base-go-to-fridge)
+     (base-go-to-fridge-init-pose)
+     ;; (base-go-to-fridge)
      (open-fridge-door-initial-pose)
      (approach-fridge-door)
-;     (grasp-fridge-door)
-
-     ;; (solve-ik-and-open-fridge-door)
-     ;; (move-forward-larm)
-     ;; (detach-fridge-handle)
-     ;; (swipe-fridge-door)
-     ;; (grasp-can-init)
-     ;; (approach-can)
-     ;; (catch-can)
-     ;; (put-arm-to-the-outside)
-
-     ;; (go-back-from-fridge)
-     ;; (close-fridge)
+     (grasp-fridge-door)
+     (solve-ik-and-open-fridge-door)
+     (move-forward-larm)
+     (detach-fridge-handle)
+     (swipe-fridge-door)
+     (grasp-can-init)
+     (approach-can)
+     (catch-can)
+     (put-arm-to-the-outside)
+     (go-back-from-fridge)
+     (close-fridge)
      ))
   (cond
    (stages
@@ -524,8 +522,8 @@
     ))
 
 (load "package://jsk_perception/euslisp/detection_interface.l")
-(load "package://pr2eus/pr2-interface.l")
-(pr2-init)
+;; (load "package://pr2eus/pr2-interface.l")
+;; (pr2-init)
 
 (defun getfridge ()
   (fridge)
