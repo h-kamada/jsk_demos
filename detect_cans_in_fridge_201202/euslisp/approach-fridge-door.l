@@ -15,10 +15,11 @@
    (*dryrun*
     )
    (t
-    (dotimes (i 10 nil)
-      (setq ret (approach-fridge-door))
-      (if ret (return))
-      )
+    ;; (dotimes (i 10 nil)
+    ;;   (setq ret (approach-fridge-door))
+    ;;   (if ret (return))
+    ;;   )
+    (approach-fridge-door)
     ))
   (send server :set-succeeded (send server :result))
   (send *pr2* :reset-pose) ;; for another try

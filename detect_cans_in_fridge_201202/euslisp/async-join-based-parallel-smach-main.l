@@ -377,19 +377,19 @@
    '(
      (base-go-to-fridge-init-pose (:head :torso))
 ;     (base-go-to-fridge (:base))
-     (open-fridge-door-initial-pose (:rarm :larm :head :torso))
-     (approach-fridge-door (:base :rarm :rgripper))
-     (grasp-fridge-door (:rgripper))
-     (solve-ik-and-open-fridge-door (:rarm :rgripper))
-     (move-forward-larm (:rarm :larm)) ;; rarm add
+     (open-fridge-door-initial-pose (:head :torso))
+     (approach-fridge-door (:base :rarm))
+     (grasp-fridge-door (:rarm :rgripper))
+     (solve-ik-and-open-fridge-door (:head)) ;; immediately start solve-ik so no collision head
+     (move-forward-larm (:larm) duration) ;; duration
      (detach-fridge-handle (:rgripper))
      (swipe-fridge-door (:larm :rarm))
-     (grasp-can-init (:rarm :larm :head))
-     (approach-can (:base :larm))
+     (grasp-can-init (:rarm :larm))
+     (approach-can (:base :larm)) ;; go分けないとbase動いてくれない
      (catch-can (:larm :lgripper))
      (put-arm-to-the-outside (:larm))
-     (go-back-from-fridge (:base :lgripper)) ;; lgripper add
-     (close-fridge (:rarm))
+     (go-back-from-fridge (:base)) ;; lgripper add
+     (close-fridge (:larm :rarm))
      ))
   (cond
    (stages
@@ -445,17 +445,17 @@
   (make-hsm
    fridge-demo
    '(
-     (base-go-to-fridge-init-pose)
+;     (base-go-to-fridge-init-pose)
      ;; (base-go-to-fridge)
-     (open-fridge-door-initial-pose)
-     (approach-fridge-door)
-     (grasp-fridge-door)
-     (solve-ik-and-open-fridge-door)
-     (move-forward-larm)
-     (detach-fridge-handle)
-     (swipe-fridge-door)
-     (grasp-can-init)
-     (approach-can)
+     ;; (open-fridge-door-initial-pose)
+     ;; (approach-fridge-door)
+     ;; (grasp-fridge-door)
+     ;; (solve-ik-and-open-fridge-door)
+     ;; (move-forward-larm)
+     ;; (detach-fridge-handle)
+     ;; (swipe-fridge-door)
+     ;; (grasp-can-init)
+     ;; (approach-can)
      (catch-can)
      (put-arm-to-the-outside)
      (go-back-from-fridge)
@@ -471,6 +471,12 @@
 
 (defun return-t (userdata)
   (ros::ros-info "return-t func called")
+  )
+
+(defun duration (userdata)
+  (warning-message 4 "wait 10 s~%")
+  (unix:sleep 10)
+  (warning-message 4 "wait end~%")
   )
 
 (defun demo4 (&optional (stages nil))
