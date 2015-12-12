@@ -357,8 +357,8 @@
 	 (lst (cddr cds-traj))
 	 (time-tick (/ (* (- func-time 16) 1000) (length lst)));;changing opening-door speed
 	 avs tms)
-    (when move-robot  ;; open-gripper
-      (send *ri* :move-gripper hand 0.09 :wait nil))
+    ;; (when move-robot  ;; open-gripper
+    ;;   (send *ri* :move-gripper hand 0.09 :wait nil))
     (when fix-waist-z
       (unless (numberp fix-waist-z) (setq fix-waist-z 130))
       (send *pr2* :torso :waist-z :joint-angle fix-waist-z))
@@ -375,31 +375,39 @@
     ;;           :use-torso (if use-torso (/ use-torso 5))
     ;;           :rotation-axis t :sec start-sec :move-robot move-robot)
 
+    ;; below takes 1s But ik time short so grasp again
+    (warning-message 4 "[~A] a_a~%" (ros::time-now))
     (let ((grasp-ret (if move-robot (send *ri* :start-grasp hand :gain 0.1 :objects nil) 10)))
       (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
                  (and grasp-check
                       (< grasp-ret 8))) ;; grasp
         (ros::ros-warn "Grasp handle failed, return from execute-open")
         (return-from move-fridge-traj nil)))
-
-    (dolist (rr lst)
-      (let ((ik-solved
-             (send *pr2* :inverse-kinematics
-                   (send rr :worldcoords)
-                   :use-torso use-torso
-                   :move-arm hand :rotation-axis ra :debug-view nil :warnp nil)))
-        (unless (or ik-solved (eq ra nil))
-          (warn ";; retry ~A~%" rr);
-          (setq ik-solved
-                (send *pr2* :inverse-kinematics
-                      (send rr :copy-worldcoords)
-                      :use-torso use-torso
-                      :move-arm hand :rotation-axis nil :debug-view nil :warnp nil)))
-        (unless ik-solved (warn ";; failed ~A~%" rr))
-        (when ik-solved
-          (push (send *pr2* :angle-vector) avs)
-          (push time-tick tms))
-        ))
+    (let (start-time)
+      (warning-message 4 "[~A] a~%" (ros::time-now))
+      (setq start-time (ros::time-now))
+      (dolist (rr lst)
+        (let ((ik-solved
+               (send *pr2* :inverse-kinematics
+                     (send rr :worldcoords)
+                     :use-torso use-torso :stop 10 ;; end time change
+                     :move-arm hand :rotation-axis ra :debug-view nil :warnp nil)))
+          (unless (or ik-solved (eq ra nil))
+                  (warn ";; retry ~A~%" rr);
+                  (setq ik-solved
+                        (send *pr2* :inverse-kinematics
+                              (send rr :copy-worldcoords)
+                              :use-torso use-torso
+                              :move-arm hand :rotation-axis nil :debug-view nil :warnp nil)))
+          (unless ik-solved (warn ";; failed ~A~%" rr))
+          (warning-message 4 "solve ik[~A]~%" (ros::time-now))
+          (when ik-solved
+            (push (send *pr2* :angle-vector) avs)
+            (push time-tick tms))
+          ))
+      (warning-message 4 "time:~A b~%" (ros::time-now))
+      (warning-message 4 "ik solve time:~A~%" (ros::time- (ros::time-now) start-time))
+      )
     (when return-sequence
       (return-from move-fridge-traj (list (reverse avs) tms)))
 
@@ -408,6 +416,7 @@
       ;; add rarm-controller 直すべき
       (send *ri* :angle-vector-sequence (reverse avs) tms :rarm-controller))
     ;; finalize
+    (warning-message 4 "time:~A c~%" (ros::time-now))
     (cond
      ((integerp wait-time)
       (send *ri* :ros-wait wait-time :spin-self t)) ;; attention-check ...
@@ -423,6 +432,7 @@
     ;; ;;
     ;; (send *ri* :ros-wait 0.0 :spin t :spin-self t) ;; attention-check ...
     (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+    (warning-message 4 "d~%")
     (let ((end-pt (send *pr2* hand :end-coords :worldpos))
           idx)
       (setq idx (position (find-extream lst #'(lambda(x) (distance (send x :worldpos) end-pt)) #'<) lst))
@@ -808,7 +818,7 @@
         (y-thre 100) ;; 追っかけ手の動き幅(y)
         (default-cds (float-vector 600 0 1160))
         (end-time (ros::time+ (ros::time-now) (ros::time timeout)))
-        (ratio 0.7)
+        (ratio 0.9)
         )
     (while t
       (when (ros::time> (ros::time-now) end-time) ;; timeout
@@ -826,7 +836,7 @@
                          :rpy (list (caar (send tmp-cds :rpy-angle)) 0 0)))
       (send tmp-cds :transform (send *pr2* :worldcoords) :world)
       (setq *cds* tmp-cds)
-      ;; approach-can version so not use
+      ;; approach- can version so not use
       ;; (setq tmp-cds (send (send (send *pr2* :worldcoords) :transformation
       ;;                           (send cds :worldcoords)) :copy-worldcoords))
       ;; (send tmp-cds :orient 0 :z :world)
@@ -839,7 +849,7 @@
         (send *pr2* :angle-vector prev-av)
         (send *pr2* :torso :waist-z :joint-angle 130) ;; torso 動かないように
         (send *pr2* :rarm :angle-vector hand-av))
-      ;; approach-can version not use
+      ;; approach- can version not use
       ;; for inverse-kinematics initial pose
       ;; (send *pr2* :reset-pose)
       ;; (send *pr2* :torso :waist-z :joint-angle 130)
@@ -1001,6 +1011,7 @@
   (let ((prev-av
          (float-vector 130.072 22.9146 57.2941 -0.001244 -117.452 0.00187 -5.72958 -360.0 3.53847 -14.7482 -76.7797 -53.201 -164.906 -61.8327 248.035 23.0347 18.336)))
     (send *pr2* :angle-vector prev-av))
+  (warning-message 4 "[~A] aa" (ros::time-now))
   (open-fridge-traj :rarm cds 1.7 :rotation-axis t :radius 490 :wait-time t)
   )
 
