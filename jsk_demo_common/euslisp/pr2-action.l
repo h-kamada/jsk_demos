@@ -376,13 +376,14 @@
     ;;           :rotation-axis t :sec start-sec :move-robot move-robot)
 
     ;; below takes 1s But ik time short so grasp again
-    (warning-message 4 "[~A] a_a~%" (ros::time-now))
-    (let ((grasp-ret (if move-robot (send *ri* :start-grasp hand :gain 0.1 :objects nil) 10)))
-      (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
-                 (and grasp-check
-                      (< grasp-ret 8))) ;; grasp
-        (ros::ros-warn "Grasp handle failed, return from execute-open")
-        (return-from move-fridge-traj nil)))
+    ;; (warning-message 4 "[~A] a_a~%" (ros::time-now))
+    ;; (let ((grasp-ret (if move-robot (send *ri* :start-grasp hand :gain 0.1 :objects nil) 10)))
+    ;;   (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
+    ;;              (and grasp-check
+    ;;                   (< grasp-ret 8))) ;; grasp
+    ;;     (ros::ros-warn "Grasp handle failed, return from execute-open")
+    ;;     (return-from move-fridge-traj nil)))
+
     (let (start-time)
       (warning-message 4 "[~A] a~%" (ros::time-now))
       (setq start-time (ros::time-now))
@@ -411,6 +412,7 @@
     (when return-sequence
       (return-from move-fridge-traj (list (reverse avs) tms)))
 
+    (unix:sleep 3) ;; temporary in parallel mode only. remove in sequential
     (when move-robot
       ;; (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
       ;; add rarm-controller 直すべき

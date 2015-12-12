@@ -376,7 +376,7 @@
    fridge-demo
    '(
      (base-go-to-fridge-init-pose (:head :torso))
-;     (base-go-to-fridge (:base))
+     (base-go-to-fridge (:base))
      (open-fridge-door-initial-pose (:head :torso))
      (approach-fridge-door (:base :rarm))
      (grasp-fridge-door (:rarm :rgripper))
@@ -475,9 +475,21 @@
 
 (defun duration (userdata)
   (warning-message 4 "wait 10 s~%")
-  (unix:sleep 10)
+  (unix:sleep 7)
+  ;; (unix:usleep 6500000)
   (warning-message 4 "wait end~%")
   )
+
+;; (defun search-fridge (userdata)
+;;   (let (ret)
+;;     (warning-message 4 "search-fridge start~%")
+;;     (while t
+;;       (ros::spin-once)
+;;       (setq ret (getcan))
+;;       (when ret
+;;         (warning-message 4 "search-fridge finish~%")
+;;         (return-from search-fridge t)
+;;         ))))
 
 (defun demo4 (&optional (stages nil))
   (make-hsm

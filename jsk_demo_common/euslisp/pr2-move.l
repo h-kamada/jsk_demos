@@ -139,7 +139,7 @@
     t
     ))
 
-(defun base-go-to-fridge-init-pose (&key (wait t) (torso-lift 130) (head-pitch 0))
+(defun base-go-to-fridge-init-pose (&key (wait t) (torso-lift 130) (head-pitch 14))
   ;;  (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
   (send *pr2* :reset-pose) ;; for arm rotation error in grasping fridge
   (send *pr2* :head :angle-vector (float-vector 0 head-pitch))
