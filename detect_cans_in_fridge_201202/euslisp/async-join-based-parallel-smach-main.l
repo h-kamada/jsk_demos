@@ -378,14 +378,16 @@
      (base-go-to-fridge-init-pose (:head :torso))
      (base-go-to-fridge (:base))
      (open-fridge-door-initial-pose (:head :torso))
-     (approach-fridge-door (:base :rarm))
+     (approach-fridge-door (:base))
+     (bring-the-hand-to-the-fridge (:rarm))
      (grasp-fridge-door (:rarm :rgripper))
      (solve-ik-and-open-fridge-door (:head)) ;; immediately start solve-ik so no collision head
      (move-forward-larm (:larm) duration) ;; duration
      (detach-fridge-handle (:rgripper))
      (swipe-fridge-door (:larm :rarm))
      (grasp-can-init (:rarm :larm))
-     (approach-can (:base :larm)) ;; go分けないとbase動いてくれない
+     (approach-can (:base)) ;; go分けないとbase動いてくれない
+     (bring-the-hand-to-the-can (:larm))
      (catch-can (:larm :lgripper))
      (put-arm-to-the-outside (:larm))
      (go-back-from-fridge (:base)) ;; lgripper add
@@ -445,17 +447,19 @@
   (make-hsm
    fridge-demo
    '(
-;     (base-go-to-fridge-init-pose)
-     ;; (base-go-to-fridge)
-     ;; (open-fridge-door-initial-pose)
-     ;; (approach-fridge-door)
-     ;; (grasp-fridge-door)
-     ;; (solve-ik-and-open-fridge-door)
-     ;; (move-forward-larm)
-     ;; (detach-fridge-handle)
-     ;; (swipe-fridge-door)
-     ;; (grasp-can-init)
-     ;; (approach-can)
+     (base-go-to-fridge-init-pose)
+      (base-go-to-fridge)
+      (open-fridge-door-initial-pose)
+     (approach-fridge-door)
+     (bring-the-hand-to-the-fridge)
+     (grasp-fridge-door)
+     (solve-ik-and-open-fridge-door)
+     (move-forward-larm)
+     (detach-fridge-handle)
+     (swipe-fridge-door)
+     (grasp-can-init)
+     (approach-can)
+     (bring-the-hand-to-the-can)
      (catch-can)
      (put-arm-to-the-outside)
      (go-back-from-fridge)

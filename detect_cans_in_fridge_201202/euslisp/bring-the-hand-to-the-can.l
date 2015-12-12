@@ -1,6 +1,5 @@
-
 (ros::load-ros-manifest "roseus_smach")
-(ros::roseus "approach_fridge_door_server")
+(ros::roseus "bring_the_hand_to_the_can_server")
 
 (defvar *dryrun* (ros::get-param "/dryrun"))
 (when (null *dryrun*)
@@ -10,23 +9,22 @@
   )
 
 (defun cb (server goal)
-  (ros::ros-info "approach-fridge-door callback func called")
+  (ros::ros-info "bring-the-hand-to-the-can callback func called")
   (cond
    (*dryrun*
+    (ros::ros-info "bring-the-hand-to-the-can (dryrun): wait 5s")
+    (unix:sleep 5)
+    (ros::ros-info "bring-the-hand-to-the-can (dryrun): wait end")
     )
    (t
-    ;; (dotimes (i 10 nil)
-    ;;   (setq ret (approach-fridge-door))
-    ;;   (if ret (return))
-    ;;   )
-    (approach-fridge-door :use-arm nil)
+    (bring-the-hand-to-the-can)
     ))
   (send server :set-succeeded (send server :result))
   (send *pr2* :reset-pose) ;; for another try
   )
 
 (setq s (instance ros::simple-action-server :init
-                  "approach_fridge_door" roseus_smach::Sub5Action
+                  "bring_the_hand_to_the_can" roseus_smach::Sub5Action
                   :execute-cb 'cb))
 
 (ros::rate 10)

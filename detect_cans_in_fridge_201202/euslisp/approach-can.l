@@ -17,7 +17,7 @@
     (ros::ros-info "approach-can (dryrun): wait end")
     )
    (t
-    (approach-can :use-arm :larm)
+    (approach-can :use-arm nil)
     ))
   (send server :set-succeeded (send server :result))
   (send *pr2* :reset-pose) ;; for another try
