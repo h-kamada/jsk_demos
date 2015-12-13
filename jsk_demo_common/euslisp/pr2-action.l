@@ -412,7 +412,8 @@
     (when return-sequence
       (return-from move-fridge-traj (list (reverse avs) tms)))
 
-    (unix:sleep 3) ;; temporary in parallel mode only. remove in sequential
+    ;; (unix:sleep 3) ;; temporary in parallel mode only. remove in sequential
+    ;; ik doesn't take so much time now. delete
     (when move-robot
       ;; (send *ri* :ros-wait 0.0 :spin-self t) ;; attention-check ...
       ;; add rarm-controller 直すべき
@@ -1075,8 +1076,8 @@ let's go. temporary function below
     (return-from grasp-fridge-door nil)))
   (let ((grasp-ret (if move-robot
                        ;; grasp直後にik解くためにこうした
-                       ;; (send *ri* :start-grasp :rarm :gain 0.1 :objects nil) 10)))
-                       (send *ri* :move-gripper :rarm 0.0 :effort (* 2000 0.1) :wait nil) 10)))
+                       (send *ri* :start-grasp :rarm :gain 0.1 :objects nil) 10)))
+                       ;; (send *ri* :move-gripper :rarm 0.0 :effort (* 2000 0.1) :wait nil) 10)))
     ;; とりあえずcomment out   solve-ikの後にチェックは入るべき
     ;; (when (and (not (send *ri* :simulation-modep)) ;;return only in real mode
     ;;            (and grasp-check
