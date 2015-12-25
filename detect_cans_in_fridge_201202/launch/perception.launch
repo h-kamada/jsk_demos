@@ -5,9 +5,9 @@
   <arg name="DEMOTYPE" default="map" />
   <arg name="app_manager" default="false" />
   <arg name="run_behavior" default="true" />
-  <arg name="visualize_fridge" default="true" />
-  <arg name="gaussian" default="false" />
-  <arg name="roi" default="true" />
+  <arg name="visualize_fridge" default="false" />
+  <arg name="gaussian" default="true" />
+  <arg name="roi" default="false" />
   <include file="$(find pr2_machine)/$(env ROBOT).machine" />
   <!-- <arg name="app_manager" default="true" /> -->
 
@@ -27,11 +27,12 @@
         machine="c2"
         args="$(find jsk_perception)/euslisp/remap-to-map-frame.l" />
 
-  <node name="gaussianmanager" pkg="nodelet" type="nodelet" args="manager"
+  <node name="gaussianmanager" pkg="nodelet" type="nodelet"
+        args="manager" machine="c2"
         output="screen" if="$(arg gaussian)"/>
   <node pkg="nodelet" type="nodelet" name="posewithcovstampedtogaussian"
         args="load jsk_pcl/PoseWithCovarianceStampedToGaussianPointCloud gaussianmanager"
-        output="screen" >
+        machine="c2" output="screen" >
     <remap from="~input" to="/simplecov" />
     <rosparam>
       cut_plane: flipped_yz
@@ -46,7 +47,9 @@
     <remap from="camera_info" to="/kinect_head_c2/rgb/camera_info"/>
   </anode>
 
-  <node pkg="jsk_pcl_ros" type="attention_clipper" name="attention_clipper" output="screen" if="$(arg roi)">
+  <node pkg="jsk_pcl_ros" type="attention_clipper"
+        name="attention_clipper"
+        if="$(arg roi)">
     <remap from="~input" to="/kinect_head_c2/rgb/camera_info" />
     <rosparam>
       dimension_x: 0.3
@@ -68,7 +71,7 @@
           machine="c2" >
       <remap from="image" to="/kinect_head_c2/rgb/image_rect_color" />
       <remap from="camera_info" to="/kinect_head_c2/rgb/camera_info"/>
-      <param name="use_mask" value="$(arg roi)" />
+      <param name="use_mask" value="true" />
       <remap from="mask" to="/attention_clipper/output/mask"/>
     </node>
     <node pkg="jsk_perception" type="point_pose_extractor" machine="c2"

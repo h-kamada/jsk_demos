@@ -401,6 +401,40 @@
     (smach-exec fridge-demo)
     )))
 
+(defun failduration (userdata)
+  (unix:sleep 5)
+  )
+(defun faildemo (&optional (stages nil))
+  (make-hsm
+   fridge-demo
+   '(
+     ;; (base-go-to-fridge-init-pose (:head :torso))
+     ;; (base-go-to-fridge (:base))
+;     (open-fridge-door-initial-pose (:head :torso))
+     (approach-fridge-door (:base))
+     (bring-the-hand-to-the-fridge (:rarm))
+     (grasp-fridge-door (:rarm :rgripper))
+     (solve-ik-and-open-fridge-door (:head)) ;; immediately start solve-ik so no collision head
+     (move-forward-larm (:larm) failduration) ;; duration
+     (detach-fridge-handle (:rgripper))
+     (swipe-fridge-door (:larm :rarm))
+     ;; (grasp-can-init (:rarm :larm))
+     ;; (approach-can (:base)) ;; go分けないとbase動いてくれない
+     ;; (bring-the-hand-to-the-can (:larm))
+     ;; (catch-can (:larm :lgripper))
+     ;; (put-arm-to-the-outside (:larm))
+     ;; (go-back-from-fridge (:base)) ;; lgripper add
+     ;; (close-fridge (:larm :rarm))
+     ))
+  (cond
+   (stages
+      (smach-exec-in-stages fridge-demo)
+      )
+   (t
+    (smach-exec fridge-demo)
+    )))
+
+
 (defun demo2 (&optional (stages nil))
   (make-hsm
    goto-fridge
@@ -448,8 +482,8 @@
    fridge-demo
    '(
      (base-go-to-fridge-init-pose)
-      (base-go-to-fridge)
-      (open-fridge-door-initial-pose)
+     (base-go-to-fridge)
+     (open-fridge-door-initial-pose)
      (approach-fridge-door)
      (bring-the-hand-to-the-fridge)
      (grasp-fridge-door)

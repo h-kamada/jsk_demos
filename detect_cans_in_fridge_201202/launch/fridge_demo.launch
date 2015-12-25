@@ -19,6 +19,9 @@
   <node pkg="roseus" type="roseus" name="approach_fridge_door" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/approach-fridge-door.l"  />
 
+  <node pkg="roseus" type="roseus" name="bring_the_hand_to_the_fridge" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/bring-the-hand-to-the-fridge.l"  />
+
   <node pkg="roseus" type="roseus" name="grasp_fridge_door" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/grasp-fridge-door.l"  />
 
@@ -39,6 +42,9 @@
 
   <node pkg="roseus" type="roseus" name="approach_can" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/approach-can.l"  />
+
+  <node pkg="roseus" type="roseus" name="bring_the_hand_to_the_can" output="screen"
+        args="$(find detect_cans_in_fridge_201202)/euslisp/bring-the-hand-to-the-can.l"  />
 
   <node pkg="roseus" type="roseus" name="catch_can" output="screen"
         args="$(find detect_cans_in_fridge_201202)/euslisp/catch-can.l"  />
