@@ -1,6 +1,6 @@
 (defvar *use-voicetext* t)
 (defvar *use-english* nil)
-(defvar *logging* t)
+(defvar *logging* nil)
 
 ;; open fridge and pick a can (and close the door)
 (require :pr2-interface "package://pr2eus/pr2-interface.l")
